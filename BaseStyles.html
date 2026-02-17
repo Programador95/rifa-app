@@ -1,0 +1,122 @@
+<style>
+    /* ===== GOOGLE FONTS ===== */
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+    /* ===== RESET E BASE ===== */
+    * {
+        box-sizing: border-box;
+    }
+
+    body {
+        font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        margin: 0;
+        padding: 0;
+        background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+        min-height: 100vh;
+        color: #1e293b;
+        line-height: 1.5;
+    }
+
+    .container {
+        max-width: 1600px;
+        width: 100%;
+        margin: 0 auto;
+        padding: 16px 20px;
+        box-sizing: border-box;
+    }
+
+    /* ===== MAIN LAYOUT - DUAS COLUNAS ===== */
+    .main-layout {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 20px;
+        margin-top: 16px;
+    }
+
+    @media (min-width: 1025px) {
+        .main-layout {
+            grid-template-columns: 380px 1fr;
+            gap: 30px;
+            align-items: start;
+        }
+    }
+
+    .left-column {
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+    }
+
+    .right-column {
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+    }
+
+    /* ===== OUTROS ELEMENTOS BASE ===== */
+    .total {
+        margin: 15px 0;
+        font-weight: bold;
+        color: #333;
+        padding: 10px;
+        background: #fff;
+        border-radius: 5px;
+        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+        font-size: 18px;
+        -webkit-text-size-adjust: none;
+        -moz-text-size-adjust: none;
+        -ms-text-size-adjust: none;
+        text-size-adjust: none;
+    }
+
+    .pix-info {
+        margin-top: 20px;
+        padding: 15px;
+        background: #fff;
+        border-left: 5px solid #4CAF50;
+        border-radius: 5px;
+        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+    }
+
+    .pix-info strong {
+        color: #4CAF50;
+    }
+
+    /* ===== TOAST ===== */
+    .error-toast {
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        background: #f29999;
+        color: white;
+        padding: 20px 25px;
+        border-radius: 12px;
+        box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3);
+        z-index: 9999;
+        max-width: 90vw;
+        text-align: center;
+        font-size: 16px;
+        animation: toastAppear 0.4s ease;
+    }
+
+    @keyframes toastAppear {
+        0% {
+            opacity: 0;
+            transform: translate(-50%, -50%) scale(0.8);
+        }
+
+        100% {
+            opacity: 1;
+            transform: translate(-50%, -50%) scale(1);
+        }
+    }
+
+    @media (max-width: 480px) {
+        .error-toast {
+            padding: 18px 20px;
+            font-size: 15px;
+            max-width: 85vw;
+        }
+    }
+</style>

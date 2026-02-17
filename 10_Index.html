@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <base target="_top">
+  <title>Rifa Online 🎟️</title>
+  <meta name="viewport"
+    content="width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=5.0, user-scalable=yes">
+
+  <!-- Incluir CSS -->
+  <?!= include('BaseStyles') ?>
+  <?!= include('LayoutStyles') ?>
+  <?!= include('NumberGridStyles') ?>
+  <?!= include('ButtonStyles') ?>
+  <?!= include('FormStyles') ?>
+  <?!= include('PopupStyles') ?>
+  <?!= include('UtilityStyles') ?>
+  <?!= include('DesktopStyles') ?>
+</head>
+
+<body>
+  <!-- ToastContainer deve ficar no topo do body -->
+  <?!= include('ToastContainer') ?>
+
+  <!-- Container principal com o conteúdo -->
+  <div class="container">
+    <?!= include('Header') ?>
+
+    <!-- Layout Principal em Duas Colunas -->
+    <div class="main-layout">
+
+      <!-- Coluna Esquerda: Imagem, Progresso e Info de Números -->
+      <div class="left-column">
+        <?!= include('ProductImage') ?>
+        <?!= include('ProgressBar') ?>
+        <?!= include('ProgressText') ?>
+        <?!= include('NumberInfo') ?>
+      </div>
+
+      <!-- Coluna Direita: Formulário e Grid -->
+      <div class="right-column">
+        <?!= include('FormSection') ?>
+        <?!= include('RandomSelection') ?>
+        <?!= include('GridTitle') ?>
+        <?!= include('NumberGrid') ?>
+        <?!= include('TotalSection') ?>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Elementos que ficam fora do container principal -->
+  <?!= include('WhatsAppPopup') ?>
+  <?!= include('ScrollButtons') ?>
+  <?!= include('WhatsAppLink') ?>
+  <?!= include('Overlay') ?>
+
+  <?!= include('SuccessPopup') ?>
+  <?!= include('InfoPopups') ?>
+  <?!= include('PaymentPopup') ?>
+
+  <?!= include('ResponsiveStyles') ?>
+
+  <!-- JavaScript sempre por último -->
+  <?!= include('Scripts') ?>
+</body>
+
+</html>
