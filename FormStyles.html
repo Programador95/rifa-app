@@ -1,0 +1,136 @@
+<style>
+/* =============================================================
+   FORM STYLES - Formulários e inputs
+   ============================================================= */
+/* ===== FORM SECTION ===== */
+.form-section {
+  background: var(--color-card);
+  border-radius: var(--radius-xl);
+  padding: var(--space-base);
+  box-shadow: var(--color-card-shadow);
+  margin-bottom: var(--space-base);
+  width: 100%;
+  box-sizing: border-box;
+}
+/* ===== FORM ROW ===== */
+.form-row {
+  display: flex;
+  flex-direction: var(--form-direction);
+  flex-wrap: nowrap;
+  gap: 20px;
+  align-items: flex-end;
+  overflow-x: auto;
+  padding-bottom: 5px;
+}
+/* ===== FORM GROUP ===== */
+.form-group {
+  flex: 1 1 auto;
+  min-width: 80px;
+  margin-bottom: 0;
+}
+.form-group label,
+.form-group label strong {
+  display: block;
+  margin-bottom: 2px;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  font-size: var(--form-label-font);
+  white-space: nowrap;
+}
+/* ===== INPUTS ===== */
+.form-group input[type="text"],
+.form-group input[type="tel"] {
+  width: 100%;
+  border: 2px solid var(--color-border);
+  border-radius: var(--input-radius);
+  transition: all 0.2s;
+  outline: none;
+  padding: var(--input-padding);
+  font-size: var(--input-font-size);
+  height: var(--input-height);
+  background: var(--color-input-bg);
+  color: var(--color-text);
+  box-sizing: border-box;
+  max-width: 100%;
+}
+.form-group input[type="text"]:focus,
+.form-group input[type="tel"]:focus {
+  border-color: var(--color-primary-medium);
+  box-shadow: var(--color-input-focus-shadow);
+}
+/* Inputs genéricos */
+input[type="text"],
+input[type="tel"],
+input[type="number"],
+select {
+  padding: var(--input-padding);
+  font-size: var(--input-font-size);
+  background: var(--color-input-bg);
+  color: var(--color-text);
+  max-width: 100%;
+  box-sizing: border-box;
+}
+label {
+  font-size: var(--form-label-font);
+  color: var(--color-text-secondary);
+}
+/* ===== NAME FIELD ===== */
+.name-field input {
+  transition: border-color 0.3s ease, box-shadow 0.3s ease;
+}
+.name-field input:focus {
+  border-color: var(--color-success);
+  box-shadow: 0 0 5px var(--color-success-bg);
+}
+/* ===== CHAR COUNTER ===== */
+.char-counter {
+  display: block;
+  margin-top: 5px;
+  font-size: 12px;
+  color: var(--color-text-light);
+  text-align: right;
+}
+/* ===== AJUSTE FORM NO MOBILE ===== */
+@media (max-width: 768px) {
+  .form-row {
+    flex-direction: column;
+    gap: 14px;
+    overflow-x: visible;
+  }
+  .form-group {
+    min-width: unset;
+    width: 100%;
+  }
+  .form-group input[type="text"],
+  .form-group input[type="tel"] {
+    max-width: 100%;
+    width: 100%;
+  }
+  .form-section .btn-confirmar-dados {
+    width: 100%;
+    padding: 14px 20px;
+    font-size: var(--fs-base);
+    height: auto;
+    min-height: var(--input-height);
+    margin: 0;
+    box-sizing: border-box;
+  }
+}
+/* No desktop, form-row em linha com campos de largura fixa */
+@media (min-width: 1025px) {
+  .form-row {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: nowrap;
+    gap: 12px;
+    align-items: flex-end;
+  }
+  .form-group {
+    flex: 0 0 auto;
+    width: 200px;
+  }
+  .form-group input {
+    max-width: 200px;
+  }
+}
+</style>

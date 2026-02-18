@@ -1,0 +1,80 @@
+<!-- ===== POPUP DE VERIFICAÇÃO WHATSAPP (CORRIGIDO) ===== -->
+<div id="popupVerificacao" class="popup-overlay">
+  <div class="popup-verificacao">
+    <div class="popup-header">
+      <h2>📱 Verificação por WhatsApp</h2>
+      <p>Um código de 6 números foi enviado para:</p>
+      <p class="destaque-telefone" id="telefoneDestaque">Carregando...</p>
+    </div>
+    
+    <div class="codigo-container">
+      <input type="tel" 
+             class="codigo-input-individual" 
+             data-index="0"
+             maxlength="1"
+             autocomplete="off"
+             spellcheck="false"
+             inputmode="numeric"
+             pattern="[0-9]*">
+      <input type="tel" 
+             class="codigo-input-individual" 
+             data-index="1"
+             maxlength="1"
+             autocomplete="off"
+             spellcheck="false"
+             inputmode="numeric"
+             pattern="[0-9]*">
+      <input type="tel" 
+             class="codigo-input-individual" 
+             data-index="2"
+             maxlength="1"
+             autocomplete="off"
+             spellcheck="false"
+             inputmode="numeric"
+             pattern="[0-9]*">
+      <input type="tel" 
+             class="codigo-input-individual" 
+             data-index="3"
+             maxlength="1"
+             autocomplete="off"
+             spellcheck="false"
+             inputmode="numeric"
+             pattern="[0-9]*">
+      <input type="tel" 
+             class="codigo-input-individual" 
+             data-index="4"
+             maxlength="1"
+             autocomplete="off"
+             spellcheck="false"
+             inputmode="numeric"
+             pattern="[0-9]*">
+      <input type="tel" 
+             class="codigo-input-individual" 
+             data-index="5"
+             maxlength="1"
+             autocomplete="off"
+             spellcheck="false"
+             inputmode="numeric"
+             pattern="[0-9]*">
+    </div>
+    
+    <!-- Mensagem de status -->
+    <div id="statusMessage" class="status-message"></div>
+    
+    <div class="popup-buttons">
+      <button type="button" 
+              id="btnReenviar" 
+              class="btn-popup btn-reenviar"
+              onclick="reenviarCodigo()">
+        🔄 Reenviar
+      </button>
+      
+      <button type="button" 
+              id="btnCancelar" 
+              class="btn-popup btn-cancelar"
+              onclick="cancelarVerificacao()">
+        ✖️ Cancelar
+      </button>
+    </div>
+  </div>
+</div>
