@@ -1,0 +1,46 @@
+<div id="paymentPopup" class="popup">
+    <h3>💳 Pagamento via PIX</h3>
+    <div class="pix-info">
+        <div class="payment-summary">
+            <div class="resumo-compra">
+                <h4>📋 Números Selecionados:</h4>
+                <div id="numeros-selecionados-pagamento" class="numeros-lista"></div>
+            </div>
+            <div>
+                <h4>Valor Total</h4>
+                <p>R$ <span id="paymentAmount"></span></p>
+            </div>
+        </div>
+
+        <div class="timer-container">
+            <strong>⏰ Tempo restante:</strong>
+            <span id="timerReserva">10:00</span>
+        </div>
+
+        <div class="pix-code" id="pixCopiaCola"></div>
+        <button class="copy-pix-btn" onclick="copiarPixDinamico(this)" id="btnCopiarPix">Copiar Código PIX</button>
+
+        <div class="payment-instructions">
+            <h4>Por favor siga as instruções:</h4>
+            <ol>
+                <li>Copie o CÓDIGO PIX acima</li>
+                <li>Acesse o APP do seu banco</li>
+                <li>Cole o CÓDIGO no campo PIX e conclua</li>
+                <li>Salve o comprovante em seu celular</li>
+                <li>Nos envie o comprovante no campo abaixo e aguarde a verificação</li>
+            </ol>
+        </div>
+
+        <input type="file" id="comprovanteInput"
+            accept="image/jpeg,image/jpg,image/png,image/gif,image/bmp,application/pdf" required>
+    </div>
+    <p><strong>Atenção</strong>: Os números só serão reservados após envio do comprovante. <span>Comprovante inválido = números liberados.</span></p>
+
+    <div class="popup-buttons">
+        <button id="btn-comprovante" type="button" class="popup-button primary">
+            Enviar Comprovante
+        </button>
+        <button class="popup-button secondary"
+            onclick="fecharPaymentPopup(); forcarAtualizacaoNumeros();">Cancelar</button>
+    </div>
+</div>
