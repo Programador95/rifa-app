@@ -1,0 +1,32 @@
+<div class="form-section">
+
+  <form id="form">
+    <div class="form-row">
+      <div class="form-group name-field">
+        <label><strong>Nome:</strong></label>
+        <input type="text" name="nome" id="nome" required maxlength="30" pattern="[\p{L}\s]+"
+          title="Apenas letras e espaços são permitidos (máximo 30 caracteres)" onkeypress="return validarNome(event)"
+          oninput="validarNomeInput(event)" onpaste="limparNomeColar(event)" placeholder="Digite seu nome">
+      </div>
+
+      <div class="form-group phone-field">
+        <label><strong>Telefone:</strong></label>
+        <input type="tel" id="telefone" name="telefone" maxlength="15" required placeholder="(00) 00000-0000">
+      </div>
+
+      <button type="button" id="btnConfirmarDados" class="btn-confirmar-dados" onclick="confirmarDados()">
+        <span>✅ Confirmar Dados</span>
+      </button>
+      <!-- Adicionar no Header.html ou FormSection.html: <?!= include('RecoveryButton') ?> -->
+
+<div style="text-align:center;margin:10px 0;">
+  <button type="button" id="btnRecovery" class="btn-recovery" onclick="abrirRecoveryPopup()"
+    disabled
+    style="background:var(--warning-bg, #fff3cd);color:var(--warning-text, #856404);border:2px solid var(--warning-border, #ffeaa7);
+    padding:10px 20px;border-radius:8px;cursor:not-allowed;font-size:14px;font-weight:bold;
+    transition:all 0.3s ease;width:100%;max-width:400px;opacity:0.5;"
+    title="Confirme seu WhatsApp primeiro para usar esta função">
+    🔄 Recuperar Reserva Pendente
+  </button>
+</div>
+    </div>
