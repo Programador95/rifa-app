@@ -1,1 +1,0 @@
-<div class="toast-container" id="toastContainer"></div>
