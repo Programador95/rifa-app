@@ -1,0 +1,297 @@
+<style>
+/* =============================================================
+   DESIGN TOKENS - Sistema de variáveis CSS (Mobile-First)
+   INCLUIR ESTE ARQUIVO PRIMEIRO, ANTES DE TODOS OS OUTROS CSS
+   ============================================================= */
+/* ===== GOOGLE FONTS ===== */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+:root {
+  /* ===== CORES - LIGHT MODE ===== */
+  --color-bg: #f8fafc;
+  --color-bg-gradient: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+  --color-text: #1e293b;
+  --color-text-secondary: #334155;
+  --color-text-muted: #475569;
+  --color-text-light: #64748b;
+  --color-card: #ffffff;
+  --color-card-alt: #f9f9f9;
+  --color-card-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+  --color-card-shadow-sm: 0 2px 12px rgba(0, 0, 0, 0.06);
+  --color-border: #e2e8f0;
+  --color-border-light: #e0e0e0;
+  --color-input-bg: #ffffff;
+  --color-input-focus-shadow: 0 0 0 3px rgba(16, 185, 129, 0.1);
+  /* Cores principais (Verde) */
+  --color-primary: #059669;
+  --color-primary-medium: #10b981;
+  --color-primary-light: #34d399;
+  --color-primary-gradient: linear-gradient(135deg, #059669 0%, #10b981 50%, #34d399 100%);
+  --color-primary-btn-gradient: linear-gradient(135deg, #059669 0%, #10b981 100%);
+  --color-primary-shadow: rgba(5, 150, 105, 0.3);
+  --color-primary-bg: rgba(16, 185, 129, 0.1);
+  /* Estados */
+  --color-success: #4CAF50;
+  --color-success-dark: #2E7D32;
+  --color-success-border: #388E3C;
+  --color-success-bg: rgba(76, 175, 80, 0.1);
+  --color-danger: #C62828;
+  --color-danger-medium: #dc2626;
+  --color-danger-light: #ef4444;
+  --color-danger-bg: #ffcdd2;
+  --color-danger-border: #ef9a9a;
+  --color-danger-gradient: linear-gradient(135deg, #dc2626 0%, #ef4444 100%);
+  --color-warning: #FF8C00;
+  --color-warning-dark: #E65100;
+  --color-warning-bg: #ffe0b2;
+  --color-warning-border: #ffcc80;
+  --color-accent: #667eea;
+  --color-accent-dark: #764ba2;
+  --color-accent-bg: rgba(102, 126, 234, 0.1);
+  --color-accent-border: rgba(102, 126, 234, 0.2);
+  --color-accent-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  --color-blue: #3b82f6;
+  --color-blue-light: #60a5fa;
+  --color-blue-gradient: linear-gradient(135deg, #3b82f6 0%, #60a5fa 100%);
+  --color-blue-shadow: rgba(59, 130, 246, 0.3);
+  /* Overlays */
+  --color-overlay: rgba(0, 0, 0, 0.5);
+  --color-overlay-heavy: rgba(0, 0, 0, 0.8);
+  /* WhatsApp */
+  --color-whatsapp: #25D366;
+  /* Timer */
+  --color-timer: #e74c3c;
+  --color-timer-bg: #fff3cd;
+  --color-timer-border: #ffeaa7;
+  /* Toast */
+  --color-toast-error: #e74c3c;
+  --color-toast-success: #27ae60;
+  --color-toast-warning: #f39c12;
+  --color-toast-info: #3498db;
+  /* ===== TIPOGRAFIA (Mobile-first = valores maiores) ===== */
+  --font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-mono: 'SF Mono', 'Consolas', 'Courier New', monospace;
+  --fs-xs: 14px;
+  --fs-sm: 16px;
+  --fs-base: 17px;
+  --fs-md: 18px;
+  --fs-lg: 20px;
+  --fs-xl: 24px;
+  --fs-2xl: 28px;
+  --fs-3xl: 34px;
+  /* ===== ESPAÇAMENTO ===== */
+  --space-xs: 4px;
+  --space-sm: 8px;
+  --space-md: 12px;
+  --space-base: 16px;
+  --space-lg: 20px;
+  --space-xl: 24px;
+  --space-2xl: 32px;
+  /* ===== BORDER RADIUS ===== */
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+  --radius-full: 50%;
+  --radius-pill: 25px;
+  /* ===== CONTAINER ===== */
+  --container-padding: 8px 12px;
+  --container-max-width: 100vw;
+  /* ===== GRID DE NÚMEROS ===== */
+  --grid-cell-min: 80px;
+  --grid-cell-height: 80px;
+  --grid-cell-font: var(--fs-3xl);
+  --grid-cell-font-weight: 800;
+  --grid-gap: 6px;
+  --grid-padding: var(--space-xs);
+  --grid-max-height: 60vh;
+  --grid-min-height: 650px;
+  --grid-radius: var(--radius-md);
+  /* ===== INPUTS ===== */
+  --input-height: 52px;
+  --input-padding: 8px 5px;
+  --input-font-size: var(--fs-base);
+  --input-radius: 10px;
+  /* ===== BOTÕES ===== */
+  --btn-padding: 16px 22px;
+  --btn-font-size: var(--fs-xl);
+  --btn-radius: var(--radius-lg);
+  --btn-action-padding: 22px;
+  --btn-action-font: var(--fs-xl);
+  /* ===== POPUPS ===== */
+  --popup-width: 95%;
+  --popup-max-width: 95%;
+  --popup-padding: 30px 20px;
+  --popup-radius: var(--radius-xl);
+  --popup-header-font: var(--fs-2xl);
+  --popup-text-font: var(--fs-lg);
+  --popup-btn-font: var(--fs-xl);
+  --popup-btn-padding: 22px 30px;
+  --popup-btn-min-height: 70px;
+  /* ===== CÓDIGO VERIFICAÇÃO ===== */
+  --codigo-width: 44px;
+  --codigo-height: 90px;
+  --codigo-font: 42px;
+  --codigo-gap: 6px;
+  --codigo-radius: var(--radius-lg);
+  /* ===== POPUP VERIFICAÇÃO ===== */
+  --verificacao-width: 96%;
+  --verificacao-max-width: 96%;
+  --verificacao-min-height: 450px;
+  /* ===== POPUP PAGAMENTO ===== */
+  --payment-width: 96%;
+  --payment-max-width: 96%;
+  /* ===== FORM ROW ===== */
+  --form-direction: row;
+  --form-label-font: 15px;
+  --form-btn-text-desktop: none;
+  --form-btn-text-mobile: inline;
+  /* ===== MENU ===== */
+  --menu-padding: 12px 6px;
+  --menu-item-padding: 10px 14px;
+  --menu-item-font: 15px;
+  /* ===== LEGENDA ===== */
+  --legenda-direction: column;
+  --legenda-font: var(--fs-md);
+  --legenda-color-size: 24px;
+  /* ===== INSTRUÇÃO ===== */
+  --show-mobile-instruction: block;
+  --show-desktop-instruction: none;
+  /* ===== SCROLL BUTTONS ===== */
+  --show-scroll-btns: none;
+}
+/* ===== TABLET (769px - 1024px) ===== */
+@media (min-width: 769px) {
+  :root {
+    --container-padding: 12px 16px;
+    --grid-cell-min: 55px;
+    --grid-cell-height: 55px;
+    --grid-cell-font: var(--fs-md);
+    --grid-gap: 8px;
+    --grid-padding: var(--space-md);
+    --grid-max-height: 800px;
+    --grid-min-height: auto;
+    --fs-xs: 13px;
+    --fs-sm: 14px;
+    --fs-base: 15px;
+    --fs-md: 16px;
+    --fs-lg: 17px;
+    --fs-xl: 20px;
+    --fs-2xl: 22px;
+    --fs-3xl: 24px;
+    --input-height: 44px;
+    --input-padding: 12px 14px;
+    --input-font-size: var(--fs-base);
+    --btn-padding: 14px 20px;
+    --btn-font-size: var(--fs-md);
+    --btn-action-padding: 16px 24px;
+    --btn-action-font: var(--fs-md);
+    --popup-width: 90%;
+    --popup-max-width: 600px;
+    --popup-padding: 24px;
+    --popup-header-font: var(--fs-xl);
+    --popup-text-font: var(--fs-md);
+    --popup-btn-font: var(--fs-md);
+    --popup-btn-padding: 14px 20px;
+    --popup-btn-min-height: auto;
+    --codigo-width: 52px;
+    --codigo-height: 84px;
+    --codigo-font: 40px;
+    --codigo-gap: 10px;
+    --verificacao-width: 90%;
+    --verificacao-max-width: 500px;
+    --verificacao-min-height: auto;
+    --payment-width: 92%;
+    --payment-max-width: 640px;
+    --form-label-font: 14px;
+    --menu-padding: 12px 16px;
+    --menu-item-padding: 10px 18px;
+    --menu-item-font: 14px;
+    --legenda-direction: row;
+    --legenda-font: 14px;
+    --legenda-color-size: 14px;
+    --show-mobile-instruction: none;
+    --show-desktop-instruction: block;
+  }
+}
+/* ===== DESKTOP (1025px+) ===== */
+@media (min-width: 1025px) {
+  :root {
+    --container-padding: 16px 20px;
+    --container-max-width: 1600px;
+    --grid-cell-min: 50px;
+    --grid-cell-height: 50px;
+    --grid-cell-font: var(--fs-md);
+    --grid-cell-font-weight: 700;
+    --grid-gap: 10px;
+    --grid-padding: 15px;
+    --grid-max-height: 340px;
+    --grid-min-height: auto;
+    --grid-radius: var(--radius-lg);
+    --input-radius: 10px;
+    --btn-padding: 12px 20px;
+    --btn-font-size: var(--fs-base);
+    --btn-radius: var(--radius-md);
+    --btn-action-padding: 16px 32px;
+    --btn-action-font: var(--fs-md);
+    --popup-width: 90%;
+    --popup-max-width: 700px;
+    --popup-padding: 32px;
+    --popup-radius: 15px;
+    --codigo-width: 68px;
+    --codigo-height: 100px;
+    --codigo-font: 48px;
+    --codigo-gap: 14px;
+    --codigo-radius: var(--radius-xl);
+    --verificacao-width: 90%;
+    --verificacao-max-width: 560px;
+    --payment-width: 90%;
+    --payment-max-width: 680px;
+    --form-direction: row;
+    --form-label-font: 14px;
+    --form-btn-text-desktop: inline;
+    --form-btn-text-mobile: none;
+    --menu-padding: 12px 20px;
+    --menu-item-font: 14px;
+    --legenda-font: 13px;
+    --show-scroll-btns: flex;
+  }
+}
+/* ===== SMARTPHONES PEQUENOS (≤360px) ===== */
+@media (max-width: 360px) {
+  :root {
+    --grid-cell-min: 65px;
+    --grid-cell-height: 65px;
+    --grid-cell-font: 28px;
+    --codigo-width: 40px;
+    --codigo-height: 72px;
+    --codigo-font: 34px;
+    --codigo-gap: 4px;
+    --popup-padding: 20px 12px;
+  }
+}
+/* ===== DARK MODE ===== */
+body.dark-mode {
+  --color-bg: #0f172a;
+  --color-bg-gradient: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+  --color-text: #e2e8f0;
+  --color-text-secondary: #cbd5e1;
+  --color-text-muted: #94a3b8;
+  --color-text-light: #64748b;
+  --color-card: #1e293b;
+  --color-card-alt: #263348;
+  --color-card-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+  --color-card-shadow-sm: 0 2px 12px rgba(0, 0, 0, 0.3);
+  --color-border: #334155;
+  --color-border-light: #475569;
+  --color-input-bg: #263348;
+  --color-input-focus-shadow: 0 0 0 3px rgba(16, 185, 129, 0.2);
+  --color-overlay: rgba(0, 0, 0, 0.7);
+  --color-overlay-heavy: rgba(0, 0, 0, 0.9);
+  --color-danger-bg: rgba(198, 40, 40, 0.25);
+  --color-danger-border: rgba(239, 154, 154, 0.4);
+  --color-warning-bg: rgba(255, 140, 0, 0.2);
+  --color-warning-border: rgba(255, 204, 128, 0.4);
+  --color-timer-bg: rgba(255, 243, 205, 0.1);
+  --color-timer-border: rgba(255, 234, 167, 0.2);
+}
+</style>

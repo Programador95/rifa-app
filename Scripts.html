@@ -1,0 +1,3413 @@
+<script>
+    // ===== PATCH DE CORREÇÃO DE MEMORY LEAKS E PERFORMANCE =====
+    (function () {
+        'use strict';
+
+        // 1. GESTÃO CENTRALIZADA DE INTERVALOS
+        const IntervalManager = {
+            intervals: new Map(),
+
+            set(name, callback, delay) {
+                this.clear(name); // Limpar anterior
+                const id = setInterval(callback, delay);
+                this.intervals.set(name, id);
+                // console.log(`✅ Interval '${name}' criado`);
+                return id;
+            },
+
+            clear(name) {
+                if (this.intervals.has(name)) {
+                    clearInterval(this.intervals.get(name));
+                    this.intervals.delete(name);
+                    // console.log(`🗑️ Interval '${name}' removido`);
+                }
+            },
+
+            clearAll() {
+                this.intervals.forEach((id) => clearInterval(id));
+                this.intervals.clear();
+            }
+        };
+        window.IntervalManager = IntervalManager;
+
+        // 2. UTILITÁRIOS DE PERFORMANCE
+        window.debounce = function (func, wait) {
+            let timeout;
+            return function (...args) {
+                clearTimeout(timeout);
+                timeout = setTimeout(() => func.apply(this, args), wait);
+            };
+        };
+
+        window.throttle = function (func, limit) {
+            let inThrottle;
+            return function (...args) {
+                if (!inThrottle) {
+                    func.apply(this, args);
+                    inThrottle = true;
+                    setTimeout(() => inThrottle = false, limit);
+                }
+            };
+        };
+
+        // 3. LIMPEZA AUTOMÁTICA AO SAIR
+        window.addEventListener('beforeunload', () => IntervalManager.clearAll());
+
+        console.log('✅ Sistema de Otimização de Performance Carregado');
+    })();
+
+    const PRECO = 5.00;
+    let todosNumeros = [];
+    let todosIndisponiveis = [];
+    let numerosBloqueados = [];
+    let reservationData = null;
+    let timerInterval = null;
+    let bloqueioTimeout = null;
+    let selecoesUsuario = [];
+    let atualizacaoEmAndamento = false;
+    let limparSelecaoAtiva = false;
+    let userId = null; // ID único do usuário
+    let numerosCompradosUsuario = [];
+    let updateInterval = null;
+    let updateTimeout = null;
+    let selecaoFoiLimpaIntencional = false;
+    let ultimaAcaoUsuario = 0;
+    let timerReservaInterval = null;
+    // SOLUÇÃO ROBUSTA: Múltiplos métodos de detecção
+    let lastScrollPosition = 0;
+    let continuousMonitor;
+    let pixCopiado = false;
+    let pixColado = false;
+    let horarioCopia = null;
+    let intervaloPix = null;
+    let timerLiberacao = null; // NOVA variável para o timer
+    let verificacaoSegurancaInterval = null;
+    let currentTooltip = null;
+    let currentActiveItem = null;
+    let tooltipTimeout = null;
+    let inicioReserva = null;
+    let duracaoReserva = 10 * 60 * 1000; // 10 minutos em millisegundos
+    let inicioLiberacao = null;
+    // ===== VARIÁVEIS DE CONTROLE DA VERIFICAÇÃO =====
+    let dadosUsuario = {
+        nome: '',
+        telefone: '',
+        validado: false
+    };
+
+    let codigoVerificacao = '';
+    let tentativasReenvio = 0;
+    const MAX_TENTATIVAS = 3;
+
+    // ===== CONTROLE DE TENTATIVAS DE COMPROVANTE =====
+    let tentativasComprovante = 0;
+    const MAX_TENTATIVAS_COMPROVANTE = 3;
+
+    function copiarPixDinamico(botao) {
+        const pixCode = document.getElementById('pixCopiaCola').textContent;
+
+        navigator.clipboard.writeText(pixCode)
+            .then(() => {
+                botao.innerHTML = '✓ Copiado!';
+                botao.classList.add('copiado');
+
+                // Marcar que PIX foi copiado e registrar horário
+                pixCopiado = true;
+                horarioCopia = Date.now();
+
+                // Iniciar verificação de colagem
+                iniciarVerificacaoColagem();
+
+                setTimeout(() => {
+                    botao.innerHTML = 'Copiar Código PIX';
+                    botao.classList.remove('copiado');
+                }, 2000);
+            })
+            .catch(err => {
+                alert('Erro ao copiar: ' + err);
+            });
+    }
+
+    // FUNÇÃO PRINCIPAL - Gerar PIX com código
+    function gerarPix(valorTotal, codigoVerificacao) {
+        const valor = parseFloat(valorTotal).toFixed(2);
+
+        let basePix = '00020126580014BR.GOV.BCB.PIX01360425e42f-c2b4-4352-8428-740ee60483b4520400005303986';
+        let valorPix = '54' + String(valor.length).padStart(2, '0') + valor;
+
+        // ✅ CORREÇÃO: Calcular o comprimento correto do campo 62
+        let infoAdicional = 'RifaNotebook';
+        if (codigoVerificacao && codigoVerificacao.trim() !== '') {
+            infoAdicional += codigoVerificacao;
+        }
+
+        // O campo 62 tem estrutura: 62 + [tamanho] + [subcampo]
+        // Subcampo: 05 + [tamanho do texto] + [texto]
+        let subcampo = '05' + String(infoAdicional.length).padStart(2, '0') + infoAdicional;
+        let campo62 = '62' + String(subcampo.length).padStart(2, '0') + subcampo;
+
+        let resto = '5802BR5925Eduardo Henrique de Paula6011Santa Luzia';
+
+        // Montar PIX sem CRC
+        let pixSemCRC = basePix + valorPix + resto + campo62 + '6304';
+
+        function crc16(str) {
+            let crc = 0xFFFF;
+            for (let i = 0; i < str.length; i++) {
+                crc ^= str.charCodeAt(i) << 8;
+                for (let j = 0; j < 8; j++) {
+                    if (crc & 0x8000) crc = (crc << 1) ^ 0x1021;
+                    else crc <<= 1;
+                }
+            }
+            return (crc & 0xFFFF).toString(16).toUpperCase().padStart(4, '0');
+        }
+
+        let crc = crc16(pixSemCRC);
+        let pixCompleto = pixSemCRC + crc;
+
+        console.log('=== DEBUG PIX ===');
+        console.log('Info adicional:', infoAdicional, '(', infoAdicional.length, 'chars)');
+        console.log('Subcampo:', subcampo, '(', subcampo.length, 'chars)');
+        console.log('Campo 62:', campo62);
+        console.log('PIX completo:', pixCompleto);
+        console.log('================');
+
+        if (document.getElementById('pixCopiaCola')) {
+            document.getElementById('pixCopiaCola').innerText = pixCompleto;
+        }
+        return pixCompleto;
+    }
+
+    // ✅ FUNÇÃO MELHORADA - Gerar PIX com código e tratamento de erros
+    function gerarPixComCodigo(valorTotal, userId) {
+        console.log('🎯 Iniciando geração de PIX para:', userId);
+
+        // Validar parâmetros
+        if (!userId || userId.toString().trim() === '') {
+            alert('❌ Erro: ID do usuário não fornecido');
+            return;
+        }
+
+        if (!valorTotal || parseFloat(valorTotal) <= 0) {
+            alert('❌ Erro: Valor inválido');
+            return;
+        }
+
+        google.script.run
+            .withSuccessHandler(function (codigoVerificacao) {
+                console.log('📨 Resposta do servidor:', codigoVerificacao);
+
+                if (codigoVerificacao && codigoVerificacao.trim() !== '') {
+                    console.log('✅ Código recebido, gerando PIX...');
+                    gerarPix(valorTotal, codigoVerificacao);
+                } else {
+                    console.error('❌ Código de verificação vazio ou null');
+                    alert('❌ Código de verificação não encontrado. Verifique se seus números estão reservados corretamente.');
+                }
+            })
+            .withFailureHandler(function (error) {
+                console.error('❌ Erro na chamada do servidor:', error);
+                alert('❌ Erro ao buscar código: ' + error.message);
+            })
+            .buscarCodigoVerificacao(userId);
+    }
+
+    function formatarTelefone(input) {
+        let valor = input.value.replace(/\D/g, '');
+
+        if (valor.length <= 11) {
+            valor = valor.replace(/(\d{2})(\d)/, '($1) $2');
+            valor = valor.replace(/(\d{4,5})(\d{4})$/, '$1-$2');
+        }
+
+        input.value = valor;
+    }
+
+    function confirmarDados() {
+        const btn = document.getElementById('btnConfirmarDados');
+        if (btn && btn.getAttribute('data-confirmado') === 'true') {
+            mostrarPopupJaConfirmado();
+            return;
+        }
+        const nome = document.getElementById('nome').value.trim();
+        const telefone = document.getElementById('telefone').value.trim();
+
+        // Validações básicas
+        if (!nome || nome.length < 3) {
+            mostrarErroAmigavel('Digite um nome válido (mínimo 3 caracteres)');
+            document.getElementById('nome').focus();
+            return;
+        }
+
+        const numeroTelefone = telefone.replace(/\D/g, '');
+        if (!telefone || numeroTelefone.length < 11) {
+            mostrarErroAmigavel('Digite um telefone válido (mínimo 11 dígitos)');
+            document.getElementById('telefone').focus();
+            return;
+        }
+
+        iniciarProcessoValidacao(nome, telefone);
+    }
+
+    // ✅ FUNÇÃO SEPARADA: Processo normal de validação
+    function iniciarProcessoValidacao(nome, telefone) {
+        // Salvar dados
+        dadosUsuario.validado = false;
+        dadosUsuario.nome = nome;
+        dadosUsuario.telefone = telefone;
+
+        // Salvar no cache do navegador
+        try {
+            sessionStorage.setItem('dadosUsuario', JSON.stringify(dadosUsuario));
+        } catch (e) {
+            console.warn('Não foi possível salvar no sessionStorage:', e);
+        }
+
+        // Mostrar loading no botão
+        const btn = document.getElementById('btnConfirmarDados');
+        if (!btn) {
+            mostrarErroAmigavel('Erro interno: botão não encontrado');
+            return;
+        }
+
+        const textoOriginal = btn.innerHTML;
+        btn.innerHTML = '<span class="loading-spinner"></span>Enviando...';
+        btn.disabled = true;
+
+        // Chamar função do Google Apps Script
+        google.script.run
+            .withSuccessHandler(function (resultado) {
+                // Sempre restaurar o botão primeiro
+                restaurarBotao(btn, textoOriginal);
+
+                if (resultado && resultado.success) {
+                    codigoVerificacao = resultado.codigo;
+                    try {
+                        sessionStorage.setItem('codigoVerificacao', codigoVerificacao);
+                    } catch (e) {
+                        console.warn('Não foi possível salvar código no sessionStorage:', e);
+                    }
+                    abrirPopupVerificacao();
+                } else {
+                    const mensagemErro = tratarMensagemErro(resultado);
+                    mostrarErroAmigavel(mensagemErro);
+                }
+            })
+            .withFailureHandler(function (erro) {
+                // Sempre restaurar o botão primeiro
+                restaurarBotao(btn, textoOriginal);
+
+                console.error('Erro na chamada:', erro);
+                const mensagemErro = tratarErroConexao(erro);
+                mostrarErroAmigavel(mensagemErro);
+            })
+            .validarDadosEEnviarCodigo({
+                nome: nome,
+                telefone: telefone
+            });
+    }
+
+    // Função para restaurar o estado do botão
+    function restaurarBotao(btn, textoOriginal) {
+        if (btn) {
+            btn.innerHTML = textoOriginal;
+            btn.disabled = false;
+        }
+    }
+
+    // ===== CONFIRMAR DADOS BUTTON STATE =====
+    function desabilitarBotaoConfirmarDados() {
+        const btn = document.getElementById('btnConfirmarDados');
+        if (!btn) return;
+        // Não usar disabled=true pois impede onclick — usar atributo personalizado
+        btn.setAttribute('data-confirmado', 'true');
+        btn.style.opacity = '0.5';
+        btn.style.cursor = 'not-allowed';
+        btn.title = 'Dados já confirmados';
+    }
+
+    function habilitarBotaoConfirmarDados() {
+        const btn = document.getElementById('btnConfirmarDados');
+        if (!btn) return;
+        btn.removeAttribute('data-confirmado');
+        btn.style.opacity = '';
+        btn.style.cursor = '';
+        btn.title = '';
+    }
+
+
+
+    // Função para tratar mensagens de erro do resultado
+    function tratarMensagemErro(resultado) {
+        if (!resultado || !resultado.error) {
+            return 'Erro desconhecido. Tente novamente.';
+        }
+
+        const erro = resultado.error.toLowerCase();
+
+        // Mapeamento de erros técnicos para mensagens amigáveis
+        if (erro.includes('numero_nao_reconhecido') || erro.includes('número não reconhecido')) {
+            return 'Número de WhatsApp não encontrado. Verifique se o número está correto e possui WhatsApp ativo.';
+        }
+
+        if (erro.includes('502') || erro.includes('bad gateway')) {
+            return 'Sistema de WhatsApp temporariamente indisponível. Tente novamente em alguns instantes.';
+        }
+
+        if (erro.includes('500') || erro.includes('internal server error')) {
+            return 'Erro no servidor. Tente novamente em alguns minutos.';
+        }
+
+        if (erro.includes('503') || erro.includes('service unavailable')) {
+            return 'Serviço temporariamente indisponível. Tente novamente em alguns instantes.';
+        }
+
+        if (erro.includes('nome deve ter pelo menos')) {
+            return 'Nome muito curto. Digite pelo menos 3 caracteres.';
+        }
+
+        if (erro.includes('telefone deve ter pelo menos')) {
+            return 'Número de telefone inválido. Digite um número com pelo menos 10 dígitos.';
+        }
+
+        if (erro.includes('timeout') || erro.includes('time out')) {
+            return 'Tempo esgotado. Verifique sua conexão e tente novamente.';
+        }
+
+        if (erro.includes('network') || erro.includes('conexão')) {
+            return 'Problema de conexão. Verifique sua internet e tente novamente.';
+        }
+
+        if (erro.includes('whatsapp')) {
+            return 'Erro ao enviar WhatsApp. Verifique se o número está correto e tente novamente.';
+        }
+
+        // Remove prefixos técnicos e retorna mensagem mais limpa
+        let mensagemLimpa = resultado.error
+            .replace(/^Error:\s*/i, '')
+            .replace(/^Erro:\s*/i, '')
+            .replace(/^Exception:\s*/i, '');
+
+        return mensagemLimpa || 'Erro inesperado. Tente novamente.';
+    }
+
+    // Função para tratar erros de conexão
+    function tratarErroConexao(erro) {
+        const erroStr = erro.toString().toLowerCase();
+
+        if (erroStr.includes('timeout') || erroStr.includes('time out')) {
+            return 'Tempo esgotado. Verifique sua conexão com a internet.';
+        }
+
+        if (erroStr.includes('network') || erroStr.includes('fetch')) {
+            return 'Erro de conexão. Verifique sua internet e tente novamente.';
+        }
+
+        if (erroStr.includes('script')) {
+            return 'Erro no sistema. Tente recarregar a página.';
+        }
+
+        return 'Erro de conexão. Verifique sua internet e tente novamente.';
+    }
+
+    // Função para mostrar erros de forma amigável (substitua alert por modal/toast)
+    // Sistema de Toast
+    function mostrarToast(tipo, mensagem, duracao = 5000) {
+        const container = document.getElementById('toastContainer');
+        if (!container) {
+            console.error('Container de toast não encontrado');
+            return;
+        }
+
+        // Ícones para cada tipo
+        const icones = {
+            error: '❌',
+            success: '✅',
+            warning: '⚠️',
+            info: 'ℹ️'
+        };
+
+        // Criar elemento do toast
+        const toast = document.createElement('div');
+        toast.className = `toast ${tipo}`;
+        toast.innerHTML = `
+                <div class="toast-content">
+                    <span class="toast-icon">${icones[tipo] || 'ℹ️'}</span>
+                    <span class="toast-message">${mensagem}</span>
+                    <button class="toast-close" onclick="fecharToast(this)">×</button>
+                </div>
+            `;
+
+        // Adicionar ao container
+        container.appendChild(toast);
+
+        // Animar entrada
+        setTimeout(() => {
+            toast.classList.add('show');
+        }, 100);
+
+        // Remover automaticamente
+        setTimeout(() => {
+            removerToast(toast);
+        }, duracao);
+    }
+
+    // Função específica para erros (substitui alert de erro)
+    function mostrarErroAmigavel(mensagem) {
+        // Remover toast anterior se existir
+        const toastAntigo = document.querySelector('.error-toast');
+        if (toastAntigo) toastAntigo.remove();
+
+        const toast = document.createElement('div');
+        toast.className = 'error-toast';
+        toast.innerHTML = `❌ ${mensagem}`;
+        document.body.appendChild(toast);
+
+        setTimeout(() => {
+            if (toast.parentNode) toast.remove();
+        }, 6000);
+    }
+
+    // Fechar toast manualmente
+    function fecharToast(botao) {
+        const toast = botao.closest('.toast');
+        removerToast(toast);
+    }
+
+    // Remover toast com animação
+    function removerToast(toast) {
+        if (toast && toast.parentNode) {
+            toast.classList.remove('show');
+            setTimeout(() => {
+                if (toast.parentNode) {
+                    toast.parentNode.removeChild(toast);
+                }
+            }, 300);
+        }
+    }
+
+    // Exemplo: manter alertas normais funcionando
+    function exemploAlertNormal() {
+        alert('Este é um alert normal que não foi modificado!');
+    }
+
+    // ✅ NOVA FUNÇÃO: Salvar código no cache após validação
+    function salvarCodigoNoCache(codigo) {
+        try {
+            localStorage.setItem('codigoVerificacao', codigo);
+            console.log('✅ Código salvo no cache:', codigo);
+        } catch (error) {
+            console.error('❌ Erro ao salvar código no cache:', error);
+        }
+    }
+
+    // ✅ FUNÇÃO AUXILIAR: Limpar código do cache (opcional)
+    function limparCodigoCache() {
+        try {
+            localStorage.removeItem('codigoVerificacao');
+            console.log('🗑️ Código removido do cache');
+        } catch (error) {
+            console.error('❌ Erro ao limpar código do cache:', error);
+        }
+    }
+
+    function abrirPopupVerificacao() {
+        const popup = document.getElementById('popupVerificacao');
+        const telefoneDestaque = document.getElementById('telefoneDestaque');
+
+        if (!popup || !telefoneDestaque) {
+            console.error('Elementos do popup não encontrados');
+            return;
+        }
+
+        // Mostrar telefone formatado
+        telefoneDestaque.textContent = dadosUsuario.telefone;
+
+        // Limpar campo de código
+        const inputs = document.querySelectorAll('.codigo-input-individual');
+        inputs.forEach(input => {
+            input.value = '';
+            input.className = 'codigo-input-individual';
+        });
+
+        // Esconder mensagem de status
+        const statusMsg = document.getElementById('statusMessage');
+        if (statusMsg) {
+            statusMsg.style.display = 'none';
+        }
+
+        // Mostrar popup
+        popup.style.display = 'flex';
+
+        // Focar no campo de código
+        setTimeout(() => {
+            const firstInput = document.querySelector('.codigo-input-individual');
+            if (firstInput) {
+                firstInput.focus();
+            }
+        }, 300);
+
+        // Mostrar mensagem de sucesso
+        mostrarStatus('Código enviado via WhatsApp! 📱', 'success');
+    }
+
+    // Função alterada para validar apenas números
+    function verificarCodigoDigitado(codigoDigitado) {
+        console.log('🔍 Verificando código:', codigoDigitado);
+
+        const inputs = document.querySelectorAll('.codigo-input-individual');
+
+        // Buscar código de múltiplas fontes
+        let codigoCorreto = codigoVerificacao || '';
+
+        if (!codigoCorreto) {
+            try {
+                codigoCorreto = sessionStorage.getItem('codigoVerificacao') || '';
+                console.log('📦 Código do sessionStorage:', codigoCorreto);
+            } catch (e) {
+                console.warn('Erro ao buscar código no sessionStorage:', e);
+            }
+        }
+
+        if (!codigoCorreto) {
+            console.error('❌ Código de verificação não encontrado');
+            mostrarStatus('❌ Código de verificação não encontrado. Tente reenviar.', 'error');
+            desabilitarBotaoComprar();
+            return;
+        }
+
+        console.log('✅ Código correto para comparação:', codigoCorreto);
+
+        if (codigoDigitado === codigoCorreto) {
+            // ✅ CÓDIGO CORRETO
+            console.log('🎯 Código correto! Processando...');
+
+            inputs.forEach(input => {
+                input.className = 'codigo-input-individual sucesso';
+            });
+
+            mostrarStatus('✅ Código correto! Liberando números...', 'success');
+
+            // Desabilitar botões do popup
+            desabilitarBotoesPopup(true);
+
+            // ✅ MARCAR COMO VALIDADO TEMPORARIAMENTE (apenas para esta sessão)
+            dadosUsuario.validado = true;
+
+            // ✅ SALVAR VALIDAÇÃO TEMPORÁRIA (será limpa ao recarregar ou após compra)
+            try {
+                sessionStorage.setItem('dadosUsuario', JSON.stringify(dadosUsuario));
+                console.log('💾 Validação temporária salva (válida apenas nesta sessão)');
+            } catch (e) {
+                console.warn('Erro ao salvar validação temporária:', e);
+            }
+
+            // ✅ HABILITAR BOTÃO DE COMPRAR
+            habilitarBotaoComprar();
+
+            // ✅ DESABILITAR CONFIRMAR DADOS (já validado, não precisa reconfirmar)
+            desabilitarBotaoConfirmarDados();
+
+            // Aguardar e liberar números
+            setTimeout(() => {
+                liberarNumeros();
+
+                // ✅ FECHAR POPUP APÓS MARCAR COMO VALIDADO
+                setTimeout(() => {
+                    fecharPopupVerificacao();
+                }, 1000);
+            }, 1500);
+
+        } else {
+            // ❌ CÓDIGO INCORRETO
+            console.log('❌ Código incorreto');
+
+            inputs.forEach(input => {
+                input.className = 'codigo-input-individual erro';
+            });
+
+            mostrarStatus('❌ Código incorreto. Tente novamente.', 'error');
+
+            // ✅ NÃO DESABILITAR BOTÃO AQUI - deixar que o usuário tente novamente
+
+            // Limpar campos após 2 segundos
+            setTimeout(() => {
+                inputs.forEach(input => {
+                    input.value = '';
+                    input.className = 'codigo-input-individual';
+                });
+                inputs[0].focus();
+
+                const statusDiv = document.getElementById('statusMessage');
+                if (statusDiv) {
+                    statusDiv.style.display = 'none';
+                }
+            }, 2000);
+        }
+    }
+
+    function mostrarStatus(mensagem, tipo) {
+        const statusDiv = document.getElementById('statusMessage');
+        if (statusDiv) {
+            statusDiv.textContent = mensagem;
+            statusDiv.className = `status-message status-${tipo}`;
+            statusDiv.style.display = 'block';
+        }
+    }
+
+    function reenviarCodigo() {
+        if (tentativasReenvio >= MAX_TENTATIVAS) {
+            alert(`❌ Limite de ${MAX_TENTATIVAS} tentativas atingido. Recarregue a página para tentar novamente.`);
+            return;
+        }
+
+        const btn = document.getElementById('btnReenviar');
+        if (!btn) return;
+
+        const textoOriginal = btn.innerHTML;
+        btn.innerHTML = '<span class="loading-spinner"></span>Reenviando...';
+        btn.disabled = true;
+
+        tentativasReenvio++;
+
+        // Chamar função do Google Apps Script novamente
+        google.script.run
+            .withSuccessHandler(function (resultado) {
+                btn.innerHTML = textoOriginal;
+                btn.disabled = false;
+
+                if (resultado && resultado.success) {
+                    codigoVerificacao = resultado.codigo;
+                    try {
+                        sessionStorage.setItem('codigoVerificacao', codigoVerificacao);
+                    } catch (e) {
+                        console.warn('Erro ao salvar novo código:', e);
+                    }
+                    mostrarStatus(`📱 Novo código enviado! (Tentativa ${tentativasReenvio}/${MAX_TENTATIVAS})`, 'success');
+
+                    // Limpar campo
+                    const camposCodigo = document.getElementById('codigoVerificacao');
+                    if (camposCodigo) {
+                        camposCodigo.value = '';
+                        camposCodigo.className = 'codigo-input';
+                        camposCodigo.focus();
+                    }
+                } else {
+                    const erro = resultado ? resultado.error : 'Erro desconhecido';
+                    mostrarStatus('❌ Erro ao reenviar: ' + erro, 'error');
+                }
+            })
+            .withFailureHandler(function (erro) {
+                btn.innerHTML = textoOriginal;
+                btn.disabled = false;
+                console.error('Erro no reenvio:', erro);
+                mostrarStatus('❌ Erro: ' + (erro.message || erro), 'error');
+            })
+            .validarDadosEEnviarCodigo({
+                nome: dadosUsuario.nome,
+                telefone: dadosUsuario.telefone
+            });
+    }
+
+    function cancelarVerificacao() {
+        // ✅ MARCAR COMO NÃO VALIDADO ANTES DE FECHAR
+        dadosUsuario.validado = false;
+
+        // Limpar dados salvos
+        try {
+            sessionStorage.removeItem('dadosUsuario');
+            sessionStorage.removeItem('codigoVerificacao');
+        } catch (e) {
+            console.warn('Erro ao limpar sessionStorage:', e);
+        }
+
+        // Resetar variáveis
+        codigoVerificacao = '';
+        tentativasReenvio = 0;
+
+        console.log('🔄 Verificação cancelada pelo usuário');
+
+        // Fechar popup (que agora vai desabilitar o botão corretamente)
+        fecharPopupVerificacao();
+    }
+
+    function fecharPopupVerificacao() {
+        const popup = document.getElementById('popupVerificacao');
+        if (popup) {
+            popup.style.transition = 'opacity 0.3s ease-out';
+            popup.style.opacity = '0';
+
+            setTimeout(() => {
+                popup.style.display = 'none';
+                popup.style.opacity = '1';
+
+                // Reabilitar botões do popup
+                desabilitarBotoesPopup(false);
+            }, 300);
+        }
+
+        // ✅ CORREÇÃO: Só desabilitar botão se usuário NÃO estiver validado
+        if (!dadosUsuario.validado) {
+            console.log('❌ Usuário não validado. Desabilitando botão comprar.');
+            desabilitarBotaoComprar();
+
+            // Limpar dados apenas se não validado
+            codigoVerificacao = '';
+            try {
+                sessionStorage.removeItem('codigoVerificacao');
+            } catch (e) {
+                console.warn('Erro ao limpar código:', e);
+            }
+        } else {
+            console.log('✅ Usuário validado. Mantendo botão comprar habilitado.');
+        }
+    }
+
+    // ===== VERIFICAR STATUS AO CARREGAR PÁGINA =====
+    document.addEventListener('DOMContentLoaded', function () {
+        console.log('🚀 Inicializando validação WhatsApp...');
+
+        // ✅ SEMPRE COMEÇAR COM BOTÃO DESABILITADO (forçar nova validação a cada carregamento)
+        desabilitarBotaoComprar();
+
+        // Configurar elementos básicos
+        configurarMascaraTelefone();
+        inicializarPagina();
+        configurarInputsCodigo();
+
+        // ✅ LIMPAR QUALQUER VALIDAÇÃO ANTERIOR (nova verificação obrigatória)
+        console.log('🔄 Limpando validação anterior - nova verificação necessária');
+        dadosUsuario.validado = false;
+        codigoVerificacao = '';
+
+        try {
+            // ✅ MANTER APENAS OS DADOS PESSOAIS, REMOVER VALIDAÇÃO
+            const dadosSalvos = sessionStorage.getItem('dadosUsuario');
+            if (dadosSalvos) {
+                const dados = JSON.parse(dadosSalvos);
+
+                // Manter nome e telefone para conveniência, mas resetar validação
+                dadosUsuario.nome = dados.nome || '';
+                dadosUsuario.telefone = dados.telefone || '';
+                dadosUsuario.validado = false; // ✅ SEMPRE FALSO AO RECARREGAR
+
+                // Preencher campos apenas com dados pessoais
+                const nomeInput = document.getElementById('nome');
+                const telefoneInput = document.getElementById('telefone');
+
+                if (nomeInput && dadosUsuario.nome) {
+                    nomeInput.value = dadosUsuario.nome;
+                    console.log('✅ Nome preenchido automaticamente');
+                }
+                if (telefoneInput && dadosUsuario.telefone) {
+                    telefoneInput.value = dadosUsuario.telefone;
+                    console.log('✅ Telefone preenchido automaticamente');
+                }
+
+                // Salvar dados atualizados (sem validação)
+                sessionStorage.setItem('dadosUsuario', JSON.stringify(dadosUsuario));
+            }
+
+            // ✅ SEMPRE REMOVER CÓDIGO DE VERIFICAÇÃO ANTERIOR
+            sessionStorage.removeItem('codigoVerificacao');
+
+        } catch (e) {
+            console.warn('Erro ao processar dados salvos:', e);
+            dadosUsuario = { nome: '', telefone: '', validado: false };
+        }
+
+        console.log('✅ Inicialização concluída - Nova validação será necessária');
+        // ✅ ADICIONAR INTERCEPTADOR DE CLIQUE NO BOTÃO COMPRAR
+        const btnComprar = document.getElementById('btnComprar');
+        if (btnComprar) {
+            btnComprar.addEventListener('click', function (e) {
+                // Se botão estiver desabilitado, interceptar o clique
+                if (btnComprar.disabled) {
+                    e.preventDefault();
+                    e.stopPropagation();
+
+                    // ✅ MOSTRAR AVISO DE VALIDAÇÃO NECESSÁRIA
+                    const erroNumeros = document.getElementById('erroNumeros');
+                    if (erroNumeros) {
+                        erroNumeros.textContent = '⚠️ Por favor, valide seu número de WhatsApp novamente para outra compra.';
+                        erroNumeros.style.display = 'block';
+                        erroNumeros.style.color = '#ff9800'; // Cor laranja para destacar
+
+                        // ✅ OPCIONAL: Scroll até o aviso
+                        erroNumeros.scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+                        console.log('❌ Tentativa de compra sem validação WhatsApp');
+                    }
+
+                    return false;
+                }
+                // Se não estiver desabilitado, deixar o submit normal prosseguir
+            });
+        }
+    });
+
+    // Função para configurar eventos dos inputs
+    function configurarInputsCodigo() {
+        const inputs = document.querySelectorAll('.codigo-input-individual');
+
+        inputs.forEach((input, index) => {
+            // Evento de digitação
+            input.addEventListener('input', function (e) {
+                const valor = e.target.value.replace(/[^0-9]/g, '');
+                e.target.value = valor;
+
+                if (valor.length === 1 && index < inputs.length - 1) {
+                    inputs[index + 1].focus();
+                }
+
+                verificarCodigoCompleto();
+            });
+
+            // Evento de cola
+            input.addEventListener('paste', function (e) {
+                e.preventDefault();
+                const pastedData = e.clipboardData.getData('text').replace(/[^0-9]/g, '');
+
+                if (pastedData.length >= 6) {
+                    for (let i = 0; i < 6; i++) {
+                        if (inputs[i]) {
+                            inputs[i].value = pastedData[i] || '';
+                        }
+                    }
+                    verificarCodigoCompleto();
+                }
+            });
+
+            // Evento de tecla (backspace)
+            input.addEventListener('keydown', function (e) {
+                if (e.key === 'Backspace' && e.target.value === '' && index > 0) {
+                    inputs[index - 1].focus();
+                }
+            });
+        });
+    }
+
+    // Função para verificar se o código está completo
+    function verificarCodigoCompleto() {
+        const inputs = document.querySelectorAll('.codigo-input-individual');
+        let codigoDigitado = '';
+
+        inputs.forEach(input => {
+            codigoDigitado += input.value;
+        });
+
+        if (codigoDigitado.length === 6) {
+            verificarCodigoDigitado(codigoDigitado);
+        } else {
+            // Resetar estilo se não estiver completo
+            inputs.forEach(input => {
+                input.className = 'codigo-input-individual';
+            });
+            const statusDiv = document.getElementById('statusMessage');
+            if (statusDiv) {
+                statusDiv.style.display = 'none';
+            }
+        }
+    }
+
+    // ============================================
+    // 1. FUNÇÃO AUXILIAR PARA CONTROLAR O BOTÃO
+    // ============================================
+    function habilitarBotaoSelecionar() {
+        const botaoSelecionar = document.getElementById('botaoSelecionar');
+
+        if (botaoSelecionar) {
+            botaoSelecionar.disabled = false;
+            botaoSelecionar.style.opacity = '1';
+            botaoSelecionar.style.cursor = 'pointer';
+
+            console.log('✅ Botão selecionar habilitado');
+        }
+    }
+
+    function desabilitarBotaoSelecionar() {
+        const botaoSelecionar = document.getElementById('botaoSelecionar');
+
+        if (botaoSelecionar) {
+            botaoSelecionar.disabled = true;
+            botaoSelecionar.style.opacity = '0.5';
+            botaoSelecionar.style.cursor = 'not-allowed';
+
+            console.log('🔒 Botão selecionar desabilitado');
+        }
+    }
+
+    function iniciarVerificacaoColagem() {
+        let tentativas = 0;
+        const maxTentativas = 30; // 30 segundos checando
+
+        // ✅ LIMPEZA DE SEGURANÇA
+        if (intervaloPix) {
+            clearInterval(intervaloPix);
+            intervaloPix = null;
+        }
+
+        intervaloPix = setInterval(() => {
+            tentativas++;
+
+            // Verificar se usuário mudou de app/aba (indicativo de uso do PIX)
+            if (document.hidden || !document.hasFocus()) {
+                pixColado = true;
+                clearInterval(intervaloPix);
+                intervaloPix = null; // ✅ Limpar referência
+                console.log('✅ PIX possivelmente usado (mudança de foco detectada)');
+
+                // NOVA LÓGICA: Iniciar timer de liberação após detectar uso do PIX
+                iniciarTimerLiberacao();
+                return;
+            }
+
+            // Parar verificação após 30 segundos
+            if (tentativas >= maxTentativas) {
+                clearInterval(intervaloPix);
+                intervaloPix = null; // ✅ Limpar referência
+                // Se não detectou uso, assumir que foi usado após 30s
+                if (!pixColado) {
+                    pixColado = true;
+                    console.log('✅ PIX assumido como usado após timeout');
+                    iniciarTimerLiberacao();
+                }
+            }
+        }, 1000);
+
+        // Detectar quando usuário volta para a página
+        const detectarRetorno = () => {
+            if (!document.hidden && pixCopiado && !pixColado) {
+                pixColado = true;
+                console.log('✅ PIX possivelmente usado (retorno à página detectado)');
+                iniciarTimerLiberacao();
+            }
+        };
+
+        document.addEventListener('visibilitychange', detectarRetorno);
+        window.addEventListener('focus', detectarRetorno);
+    }
+
+    function desabilitarBotoesPopup(desabilitar) {
+        const btnReenviar = document.getElementById('btnReenviar');
+        const btnCancelar = document.getElementById('btnCancelar');
+
+        if (btnReenviar) btnReenviar.disabled = desabilitar;
+        if (btnCancelar) btnCancelar.disabled = desabilitar;
+    }
+
+    function iniciarTimerLiberacao() {
+        // Limpar timer anterior se existir
+        if (timerLiberacao) {
+            clearTimeout(timerLiberacao);
+        }
+
+        console.log('⏳ Iniciando timer de 10 segundos para liberação do comprovante');
+
+        // ✅ NOVA LINHA: Marcar o início
+        inicioLiberacao = Date.now();
+
+        timerLiberacao = setTimeout(() => {
+            console.log('✅ Timer de 1 segundo concluído (via timeout), liberando upload');
+            habilitarInputComprovante();
+            inicioLiberacao = null; // Limpar após execução
+        }, 1000); // 1 segundo
+
+        // ✅ SOLUÇÃO ANTI-THROTTLING: Iniciar monitoramento contínuo
+        iniciarMonitoramentoTimerLiberacao();
+    }
+
+    // ✅ NOVA FUNÇÃO: Monitoramento contínuo para evitar que timer congele em background
+    function iniciarMonitoramentoTimerLiberacao() {
+        // ✅ LIMPAR MONITOR ANTERIOR (Padrão de Segurança)
+        if (window.monitorLiberacaoInterval) {
+            clearInterval(window.monitorLiberacaoInterval);
+            window.monitorLiberacaoInterval = null;
+        }
+
+        window.monitorLiberacaoInterval = setInterval(() => {
+            if (!inicioLiberacao) {
+                clearInterval(window.monitorLiberacaoInterval);
+                window.monitorLiberacaoInterval = null; // ✅ Limpar referência
+                return;
+            }
+
+            const agora = Date.now();
+            const tempoDecorrido = agora - inicioLiberacao;
+
+            // Se pasou 10s (com pequena margem de tolerância)
+            if (tempoDecorrido >= 10100) {
+                console.log('✅ Timer de liberação recuperado via monitor (Throttling detectado)');
+
+                // Limpar timeout original para não executar duas vezes
+                if (timerLiberacao) clearTimeout(timerLiberacao);
+
+                habilitarInputComprovante();
+                inicioLiberacao = null;
+                clearInterval(window.monitorLiberacaoInterval);
+                window.monitorLiberacaoInterval = null; // ✅ Limpar referência
+            }
+        }, 2000); // Verificar a cada 2 segundos
+    }
+
+    // ✅ CORREÇÃO: Verificação de segurança mais precisa
+    function iniciarVerificacaoSeguranca() {
+        // Limpar verificação anterior se existir
+        if (verificacaoSegurancaInterval) {
+            clearInterval(verificacaoSegurancaInterval);
+        }
+
+        // Aguardar 15 segundos antes de iniciar as verificações
+        setTimeout(() => {
+            console.log('🔒 Iniciando verificação de segurança da reserva');
+            console.log('🆔 Verificando para UserID:', reservationData.userId);
+
+            verificacaoSegurancaInterval = setInterval(() => {
+                if (!reservationData || !reservationData.numeros || !reservationData.userId) {
+                    console.log('⚠️ Dados de reserva não encontrados, parando verificação');
+                    clearInterval(verificacaoSegurancaInterval);
+                    return;
+                }
+
+                console.log('🔍 Verificando segurança da reserva para:', reservationData.userId);
+                console.log('📋 Números:', reservationData.numeros);
+
+                google.script.run
+                    .withSuccessHandler(resultado => {
+                        if (!resultado.sucesso) {
+                            console.log('❌ Conflito detectado:', resultado.motivo);
+                            console.log('🔍 Detalhes do conflito:', resultado.detalhes);
+
+                            // ✅ VERIFICAÇÃO ESPECÍFICA: Checar se o conflito afeta ESTE usuário
+                            if (resultado.motivo.includes('reservado por outro usuário')) {
+                                console.log('🚨 Conflito de reserva detectado - verificando se afeta este usuário...');
+
+                                // Chamar função de verificação específica
+                                verificarSeUsuarioPerdeuReserva(resultado.motivo);
+
+                            } else if (resultado.motivo.includes('não está mais reservado')) {
+                                console.log('⚠️ Número não encontrado na planilha - possível erro temporário');
+
+                                // Para este tipo de erro, fazer verificação específica também
+                                verificarSeUsuarioPerdeuReserva(resultado.motivo);
+
+                            }
+                        } else {
+                            console.log('✅ Reserva segura confirmada para usuário:', reservationData.userId);
+                        }
+                    })
+                    .withFailureHandler(erro => {
+                        console.error('❌ Erro na verificação de segurança:', erro);
+                        // Em caso de erro de rede/sistema, não fechar o popup
+                        mostrarErro('Erro na verificação de segurança. Tentando novamente...');
+                    })
+                    .verificarSegurancaReserva(reservationData.numeros, reservationData.userId);
+
+            }, 10000); // Verificar a cada 10 segundos
+
+        }, 15000); // Aguardar 15 segundos antes da primeira verificação
+    }
+
+    // ✅ FUNÇÃO CORRIGIDA: Verificar especificamente se ESTE usuário perdeu a reserva
+    function verificarSeUsuarioPerdeuReserva(motivoErro) {
+        console.log('🔍 Verificando especificamente se este usuário perdeu a reserva...');
+        console.log('🆔 UserID atual:', reservationData.userId);
+        console.log('📋 Números da reserva atual:', reservationData.numeros);
+
+        google.script.run
+            .withSuccessHandler(resultadoDetalhado => {
+                console.log('📊 Resultado da verificação detalhada:', resultadoDetalhado);
+
+                if (!resultadoDetalhado.sucesso) {
+                    console.log('🚫 CONFIRMADO: Este usuário perdeu a reserva');
+                    console.log('❌ Motivo:', resultadoDetalhado.motivo);
+
+                    // Cancelar reserva no servidor antes de fechar
+                    const dadosCancelamento = {
+                        numeros: reservationData.numeros,
+                        nome: reservationData.nome || '',
+                        telefone: reservationData.telefone || '',
+                        userId: reservationData.userId || obterIdUsuario(),
+                        codigo: reservationData.codigo || ''
+                    };
+
+                    google.script.run
+                        .withSuccessHandler(() => {
+                            console.log('✅ Reserva cancelada após detecção de conflito');
+                            mostrarErroPersonalizado(`Sua reserva foi cancelada: ${resultadoDetalhado.motivo}`, 'error');
+                            fecharPaymentPopup();
+                            setTimeout(() => carregarDadosRifa(), 500);
+                        })
+                        .withFailureHandler((erro) => {
+                            console.error('❌ Erro ao cancelar após conflito:', erro);
+                            mostrarErroPersonalizado(`Sua reserva foi cancelada: ${resultadoDetalhado.motivo}`, 'error');
+                            fecharPaymentPopup();
+                            setTimeout(() => carregarDadosRifa(), 500);
+                        })
+                        .cancelarReserva(dadosCancelamento);
+
+                    // Parar verificação
+                    clearInterval(verificacaoSegurancaInterval);
+                } else {
+                    console.log('✅ Este usuário ainda mantém sua reserva - tudo ok');
+                    mostrarSucessoTemporario('✅ Sua reserva está segura!');
+                }
+            })
+            .withFailureHandler(erro => {
+                console.error('❌ Erro na verificação específica:', erro);
+                mostrarErroPersonalizado('Erro na verificação. Tentando novamente...');
+            })
+            .verificarReservaPorUsuario(reservationData.numeros, reservationData.userId);
+    }
+
+    // ✅ FUNÇÃO AUXILIAR: Mostrar sucesso temporário (opcional)
+    function mostrarSucessoTemporario(mensagem) {
+        const sucessoDiv = document.createElement('div');
+        sucessoDiv.style.cssText = `
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        background: #d4edda;
+        color: #155724;
+        padding: 10px 20px;
+        border-radius: 8px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        z-index: 2000;
+        font-size: 14px;
+        border: 1px solid #c3e6cb;
+    `;
+        sucessoDiv.innerHTML = mensagem;
+        document.body.appendChild(sucessoDiv);
+
+        setTimeout(() => {
+            if (sucessoDiv.parentNode) {
+                sucessoDiv.remove();
+            }
+        }, 3000);
+    }
+
+    // Gerar ID único para o usuário
+    function obterIdUsuario() {
+        if (!userId) {
+            // Tentar recuperar do sessionStorage primeiro
+            userId = sessionStorage.getItem('rifaUserId');
+
+            // Se não existir, criar novo ID
+            if (!userId) {
+                userId = 'user_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+                sessionStorage.setItem('rifaUserId', userId);
+            }
+        }
+        return userId;
+    }
+
+    // Função para configurar máscara de telefone
+    function configurarMascaraTelefone() {
+        const telefoneInput = document.getElementById('telefone');
+        if (!telefoneInput) return;
+
+        telefoneInput.addEventListener('input', function () {
+            let valor = this.value.replace(/\D/g, '');
+
+            // Formatação simplificada - sempre assume celular primeiro
+            if (valor.length >= 11) {
+                // Celular completo: (XX) XXXXX-XXXX
+                valor = valor.replace(/(\d{2})(\d{5})(\d{4})/, '($1) $2-$3');
+            } else if (valor.length == 10) {
+                // Fixo completo: (XX) XXXX-XXXX
+                valor = valor.replace(/(\d{2})(\d{4})(\d{4})/, '($1) $2-$3');
+            } else if (valor.length >= 7) {
+                // Estado intermediário - formato como celular
+                valor = valor.replace(/(\d{2})(\d{1,5})(\d*)/, '($1) $2' + (valor.length > 7 ? '-$3' : '$3'));
+            } else if (valor.length >= 3) {
+                // Apenas código de área
+                valor = valor.replace(/(\d{2})(\d*)/, '($1) $2');
+            }
+
+            this.value = valor.slice(0, 15); // Limitar tamanho
+
+            // Validação
+            const numeroLimpo = valor.replace(/\D/g, '');
+            if (numeroLimpo.length < 11) {
+                this.setCustomValidity('Por favor, insira um telefone válido (mínimo 11 dígitos).');
+            } else {
+                this.setCustomValidity('');
+            }
+        });
+
+        telefoneInput.addEventListener('invalid', function () {
+            const numeroLimpo = this.value.replace(/\D/g, '');
+            if (numeroLimpo.length < 11) {
+                this.setCustomValidity('Por favor, insira um telefone válido (mínimo 11 dígitos).');
+            }
+        });
+    }
+
+    // Funções para validação do nome
+    function validarNome(event) {
+        const tecla = event.key;
+        const regex = /^[\p{L}\s]$/u;
+        if (!regex.test(tecla)) {
+            event.preventDefault();
+            return false;
+        }
+        return true;
+    }
+
+    function validarNomeInput(event) {
+        const input = event.target;
+        let valor = input.value;
+
+        // Remover caracteres inválidos
+        valor = valor.replace(/[^\p{L}\s]/gu, '');
+
+        // Limitar espaços consecutivos
+        valor = valor.replace(/\s+/g, ' ');
+
+        // Limitar tamanho
+        if (valor.length > 30) {
+            valor = valor.slice(0, 30);
+        }
+
+        input.value = valor;
+    }
+
+    function limparNomeColar(event) {
+        const dados = (event.clipboardData || window.clipboardData).getData('text');
+        const textoLimpo = dados.replace(/[^\p{L}\s]/gu, '').replace(/\s+/g, ' ').slice(0, 30);
+
+        if (textoLimpo !== dados) {
+            event.preventDefault();
+            const input = event.target;
+            setTimeout(() => {
+                input.value = textoLimpo;
+            }, 0);
+        }
+    }
+
+    function iniciarAtualizacaoPeriodica() {
+        // Aguardar Google Apps Script carregar
+        setTimeout(() => {
+            carregarDadosRifa();
+            // ✅ USAR GERENCIADOR PARA EVITAR DUPLICIDADE
+            if (window.IntervalManager) {
+                IntervalManager.set('autoUpdate', carregarDadosRifa, 5000);
+            } else {
+                // Fallback (não deve acontecer se o patch funcionar)
+                setInterval(carregarDadosRifa, 5000);
+            }
+        }, 2000);
+    }
+
+    // ADICIONAR esta função para verificar se Google Apps Script está carregado:
+    function verificarGoogleScript() {
+        return typeof google !== 'undefined' &&
+            google.script &&
+            google.script.run;
+    }
+
+    function carregarDadosRifa() {
+        const userIdAtual = obterIdUsuario();
+        console.log('Carregando dados para userId:', userIdAtual);
+
+        if (atualizacaoEmAndamento) {
+            console.log('Atualização já em andamento, pulando...');
+            return;
+        }
+
+        if (reservationData && document.getElementById('paymentPopup').style.display === 'block') {
+            console.log('🚫 Tela de pagamento ativa - pulando atualização automática');
+            return;
+        }
+
+        atualizacaoEmAndamento = true;
+
+        const timeoutSeguranca = setTimeout(() => {
+            console.log('⚠️ Timeout de segurança ativado - resetando flag');
+            atualizacaoEmAndamento = false;
+        }, 8000);
+
+        const selecoesParaManter = limparSelecaoAtiva ? [] : [...selecoesUsuario];
+
+        // ✅ Obter telefone se estiver disponível
+        const telefone = dadosUsuario.telefone || '';
+
+        google.script.run
+            .withSuccessHandler(dados => {
+                clearTimeout(timeoutSeguranca);
+                atualizacaoEmAndamento = false;
+
+                try {
+                    todosNumeros = dados.numeros;
+                    todosIndisponiveis = dados.indisponiveis || [];
+
+                    // ✅ Dados de números comprados agora vêm por telefone (se disponível)
+                    const compradosDoServidor = dados.comprados || [];
+                    const novosNumerosComprados = [...new Set(compradosDoServidor)];
+
+                    // ✅ VERIFICAR mudanças antes de atualizar
+                    const compradosOrdenados = JSON.stringify([...novosNumerosComprados].sort());
+                    const atuaisOrdenados = JSON.stringify([...numerosCompradosUsuario].sort());
+
+                    if (compradosOrdenados !== atuaisOrdenados) {
+                        console.log('🔄 Atualizando números comprados do servidor:', novosNumerosComprados);
+                        numerosCompradosUsuario = novosNumerosComprados;
+                        atualizarNumerosComprados(numerosCompradosUsuario);
+                    }
+
+                    const tempoDesdeUltimaAcao = Date.now() - ultimaAcaoUsuario;
+
+                    if (limparSelecaoAtiva) {
+                        selecoesUsuario = [];
+                    } else if (tempoDesdeUltimaAcao > 8000) {
+                        selecoesUsuario = selecoesParaManter.filter(num =>
+                            !dados.indisponiveis.includes(num) &&
+                            !numerosBloqueados.includes(num) &&
+                            !numerosCompradosUsuario.includes(num)
+                        );
+                    }
+
+                    let selecoesVisuais;
+
+                    if (reservationData && reservationData.numeros &&
+                        document.getElementById('paymentPopup').style.display === 'block') {
+                        selecoesVisuais = reservationData.numeros;
+                    } else if (reservationData && reservationData.numeros) {
+                        selecoesVisuais = [];
+                    } else {
+                        selecoesVisuais = [...selecoesUsuario];
+                    }
+
+                    renderNumerosComSelecoes(todosNumeros, todosIndisponiveis, selecoesVisuais, dados.preReservados || []);
+                    atualizarProgresso(todosNumeros.length, todosIndisponiveis.length);
+
+                    console.log('📊 Dados carregados - Comprados:', numerosCompradosUsuario);
+                } catch (error) {
+                    console.error('Erro no processamento:', error);
+                }
+            })
+            .withFailureHandler(erro => {
+                clearTimeout(timeoutSeguranca);
+                atualizacaoEmAndamento = false;
+                console.error("Falha ao carregar dados:", erro);
+            })
+            // ✅ Enviar telefone junto com userId para o backend
+            .getDadosRifaUsuario(userIdAtual, telefone);
+    }
+
+    // Adicionar event delegation para cliques
+    document.getElementById('numeros').addEventListener('click', function (e) {
+        if (e.target.matches('input[name="numeros"]')) {
+            const numero = e.target.value;
+
+            // ADICIONAR: Marcar timestamp da ação do usuário
+            ultimaAcaoUsuario = Date.now();
+
+            if (e.target.checked) {
+                selecaoFoiLimpaIntencional = false;
+            }
+
+            if (limparSelecaoAtiva) {
+                e.target.checked = false;
+                return;
+            }
+
+            if (e.target.checked) {
+                if (!numerosBloqueados.includes(numero) &&
+                    !todosIndisponiveis.includes(numero) &&
+                    !selecoesUsuario.includes(numero)) {
+                    selecoesUsuario.push(numero);
+                    console.log('Número adicionado:', numero);
+                }
+            } else {
+                selecoesUsuario = selecoesUsuario.filter(n => n !== numero);
+                console.log('Número removido:', numero);
+            }
+
+            console.log('Seleções atuais:', selecoesUsuario);
+            atualizarTotal();
+        }
+    });
+
+    // Função para obter os números atualmente selecionados
+    function obterNumerosSelecionados() {
+        const selecionados = document.querySelectorAll('input[name="numeros"]:checked');
+        return Array.from(selecionados).map(cb => cb.value);
+    }
+
+    // Nova função de renderização que mantém as seleções
+    // ✅ FUNÇÃO PARA CONGELAR ESTADO DOS NÚMEROS SELECIONADOS
+    function congelarNumerosParaPagamento(numerosSelecionados) {
+        numerosSelecionados.forEach(num => {
+            const checkbox = document.querySelector(`input[name="numeros"][value="${num}"]`);
+            if (checkbox) {
+                const label = checkbox.parentElement;
+
+                // FORÇAR estado selecionado (verde com ✓)
+                label.classList.remove('numero-indisponivel', 'numero-pre-reservado');
+                label.classList.add('numero-disponivel', 'numero-em-pagamento');
+                checkbox.checked = true;
+                checkbox.disabled = true;
+
+                // Aplicar opacity 0.5
+                label.style.opacity = '0.5';
+            }
+        });
+    }
+
+    // ✅ FUNÇÃO PARA RESTAURAR ESTADO NORMAL
+    function restaurarEstadoNormal() {
+        document.querySelectorAll('.numero-em-pagamento').forEach(label => {
+            const checkbox = label.querySelector('input');
+            const num = checkbox.value;
+
+            // ✅ VERIFICAR se número foi comprado durante este processo
+            if (numerosCompradosUsuario.includes(num)) {
+                // Aplicar estado de número comprado
+                label.classList.remove('numero-em-pagamento');
+                label.classList.add('numero-comprado-usuario');
+                label.style.opacity = '';
+                checkbox.disabled = true;
+                checkbox.checked = true;
+            } else {
+                // Lógica original para números não comprados
+                label.classList.remove('numero-em-pagamento');
+                label.style.opacity = '';
+
+                if (!label.classList.contains('numero-indisponivel') &&
+                    !label.classList.contains('numero-pre-reservado')) {
+                    checkbox.disabled = false;
+                }
+            }
+        });
+    }
+
+    // ✅ FUNÇÃO OTIMIZADA (CLAUDE SOLUTION): BATCH RENDERING
+    function renderNumerosComSelecoes(numerosPlanilha, unavailable, selecoes, preReservados = []) {
+        const numerosDiv = document.getElementById('numeros');
+        if (!numerosDiv) return;
+
+        // ===== OTIMIZAÇÃO 1: BATCH RENDERING (REMOVIDO PARA EVITAR SCROLL JUMP) =====
+        // Desconectar do DOM causava perda de foco e scroll no mobile
+        // const parent = numerosDiv.parentNode;
+        // const placeholder = document.createComment('placeholder');
+        // parent.replaceChild(placeholder, numerosDiv);
+
+        const selecoesFiltradas = selecoes.filter(num => !numerosCompradosUsuario.includes(num));
+
+        // ===== OTIMIZAÇÃO 2: USAR MAP PARA ELEMENTOS EXISTENTES =====
+        const elementosExistentes = Array.from(numerosDiv.querySelectorAll('.numero'));
+        const elementosMap = new Map();
+        elementosExistentes.forEach(el => {
+            const input = el.querySelector('input');
+            if (input) elementosMap.set(input.value, el);
+        });
+
+        // ===== OTIMIZAÇÃO 3: FRAGMENT PARA NOVOS ELEMENTOS =====
+        const fragment = document.createDocumentFragment();
+
+        numerosPlanilha.forEach(numStr => {
+            const num = numStr.toString().trim();
+            const numFormatado = num.padStart(3, '0');
+            const indisponivel = unavailable.includes(num);
+            const estaBloqueado = numerosBloqueados.includes(num);
+            const estaPreReservado = preReservados.includes(num);
+            const estaCompradoPeloUsuario = numerosCompradosUsuario.includes(num);
+
+            const estaSelecionado = selecoesFiltradas.includes(num) &&
+                !indisponivel &&
+                !estaBloqueado &&
+                !estaPreReservado &&
+                !estaCompradoPeloUsuario;
+
+            if (elementosMap.has(num)) {
+                // ===== ATUALIZAR ELEMENTO EXISTENTE =====
+                const elemento = elementosMap.get(num);
+                const checkbox = elemento.querySelector('input');
+                const span = elemento.querySelector('span');
+
+                // Só pular se está em pagamento E não é comprado pelo usuário
+                // (se é comprado, precisa atualizar visual mesmo que estivesse congelado)
+                if (elemento.classList.contains('numero-em-pagamento') && !estaCompradoPeloUsuario) {
+                    return;
+                }
+
+                // Batch de mudanças de classe
+                const classesToRemove = ['numero-disponivel', 'numero-indisponivel', 'numero-pre-reservado', 'numero-comprado-usuario'];
+                elemento.classList.remove(...classesToRemove);
+
+                elemento.style.cssText = ''; // Limpar todos os estilos inline de uma vez
+                if (span) span.style.cssText = '';
+
+                // Aplicar novo estado
+                if (estaCompradoPeloUsuario) {
+                    elemento.classList.add('numero-comprado-usuario');
+                    checkbox.disabled = true;
+                    checkbox.checked = true;
+                } else if (estaPreReservado) {
+                    elemento.classList.add('numero-pre-reservado');
+                    checkbox.disabled = true;
+                    checkbox.checked = false;
+                } else if (indisponivel || estaBloqueado) {
+                    elemento.classList.add('numero-indisponivel');
+                    checkbox.disabled = true;
+                    checkbox.checked = false;
+                } else {
+                    elemento.classList.add('numero-disponivel');
+                    checkbox.disabled = false;
+                    checkbox.checked = estaSelecionado;
+                }
+
+                span.classList.toggle('bloqueado', estaBloqueado);
+
+            } else {
+                // ===== CRIAR NOVO ELEMENTO =====
+                const label = document.createElement('label');
+                label.className = 'numero';
+
+                const checkbox = document.createElement('input');
+                checkbox.type = 'checkbox';
+                checkbox.name = 'numeros';
+                checkbox.value = num;
+
+                const span = document.createElement('span');
+                span.textContent = numFormatado;
+
+                if (estaCompradoPeloUsuario) {
+                    label.classList.add('numero-comprado-usuario');
+                    checkbox.disabled = true;
+                    checkbox.checked = true;
+                } else if (estaPreReservado) {
+                    label.classList.add('numero-pre-reservado');
+                    checkbox.disabled = true;
+                    checkbox.checked = false;
+                } else if (indisponivel || estaBloqueado) {
+                    label.classList.add('numero-indisponivel');
+                    checkbox.disabled = true;
+                    checkbox.checked = false;
+                } else {
+                    label.classList.add('numero-disponivel');
+                    checkbox.disabled = false;
+                    checkbox.checked = estaSelecionado;
+                }
+
+                span.classList.toggle('bloqueado', estaBloqueado);
+
+                label.appendChild(checkbox);
+                label.appendChild(span);
+
+                // Adicionar ao fragment em vez do DOM direto
+                fragment.appendChild(label);
+            }
+        });
+
+        // Adicionar todos os novos elementos de uma vez
+        if (fragment.hasChildNodes()) {
+            numerosDiv.appendChild(fragment);
+        }
+
+        // ===== OTIMIZAÇÃO 4: REMOVER ELEMENTOS OBSOLETOS EM BATCH =====
+        elementosExistentes.forEach(el => {
+            const num = el.querySelector('input').value;
+            if (!numerosPlanilha.includes(num)) {
+                el.remove();
+            }
+        });
+
+        // ===== OTIMIZAÇÃO 5: RECONECTAR AO DOM (REMOVIDO) =====
+        // parent.replaceChild(numerosDiv, placeholder);
+
+        // ===== OTIMIZAÇÃO 6: ATUALIZAR TOTAL APÓS RENDER COMPLETO =====
+        requestAnimationFrame(() => {
+            atualizarTotal();
+        });
+    }
+
+    function atualizarTotal() {
+        const selecionados = selecoesUsuario.length;
+        const totalDiv = document.getElementById('total');
+        totalDiv.innerHTML = selecionados > 0
+            ? `🎟️ Você selecionou <strong>${selecionados}</strong> número${selecionados > 1 ? 's' : ''}<br>💵 Total: <strong>R$ ${(selecionados * PRECO).toFixed(2).replace('.', ',')}</strong>`
+            : 'Nenhum número selecionado.';
+
+        // Atualizar também os números selecionados
+        const numerosSelecionadosDiv = document.getElementById('numerosSelecionados');
+        numerosSelecionadosDiv.textContent = selecionados > 0
+            ? selecoesUsuario.join(', ')
+            : 'Nenhum número selecionado';
+    }
+
+    function verificarConflitos(numeros) {
+        return numeros.filter(num =>
+            // ✅ IGNORAR números já comprados pelo usuário
+            !numerosCompradosUsuario.includes(num) &&
+            (todosIndisponiveis.includes(num) || numerosBloqueados.includes(num))
+        );
+    }
+
+    function verificarSelecoesValidas() {
+        const selecionados = Array.from(
+            document.querySelectorAll('input[name="numeros"]:checked')
+        ).map(cb => cb.value.padStart(3, '0'));
+
+        return selecionados.filter(num => !numerosCompradosUsuario.includes(num));
+    }
+
+    function bloquearNumeros(numeros) {
+        numerosBloqueados = [...new Set([...numerosBloqueados, ...numeros])];
+
+        // Adicionar negrito aos números bloqueados
+        numeros.forEach(num => {
+            const elemento = document.querySelector(`input[value="${num}"]`);
+            if (elemento) {
+                const span = elemento.nextElementSibling;
+                if (span) {
+                    span.classList.add('bloqueado');
+                }
+            }
+        });
+
+        renderNumerosComSelecoes(todosNumeros, todosIndisponiveis, selecoesUsuario);
+
+        clearTimeout(bloqueioTimeout);
+        bloqueioTimeout = setTimeout(() => {
+            console.log('⏰ Tempo de reserva expirado - cancelando automaticamente...');
+
+            if (reservationData && reservationData.numeros) {
+                // ✅ MOSTRAR ERRO PRIMEIRO (antes de fechar)
+                mostrarErroPersonalizado('Tempo de reserva expirado. Os números foram liberados automaticamente.');
+
+                // ✅ NOVO: Enviar notificação WhatsApp sobre expiração
+                if (reservationData.nome && reservationData.telefone) {
+                    google.script.run
+                        .withSuccessHandler(function (resultado) {
+                            console.log('📱 Notificação de reserva expirada enviada:', resultado);
+                        })
+                        .withFailureHandler(function (erro) {
+                            console.error('❌ Erro ao enviar notificação de expiração:', erro);
+                        })
+                        .enviarWhatsAppReservaExpirada(
+                            reservationData.nome,
+                            reservationData.telefone,
+                            reservationData.numeros
+                        );
+                }
+
+                // ✅ DEPOIS fechar popup (com delay para garantir que mensagem apareça)
+                setTimeout(() => {
+                    fecharPaymentPopup();
+                    forcarAtualizacaoNumeros();
+                }, 500);
+            }
+        }, 600000); // 10 minutos
+
+        iniciarTimerVisual();
+    }
+
+    function liberarNumeros(numeros = null) {
+        try {
+            if (numeros) {
+                // Lógica para liberar números específicos
+                console.log('🔓 Liberando números específicos:', numeros);
+
+                numerosBloqueados = numerosBloqueados.filter(n => !numeros.includes(n));
+
+                // Atualização visual
+                numeros.forEach(num => {
+                    const elemento = document.querySelector(`input[value="${num}"]`);
+                    if (elemento) {
+                        const span = elemento.nextElementSibling;
+                        if (span) {
+                            span.classList.remove('bloqueado');
+                            span.className = 'numero-disponivel';
+                        }
+                        elemento.disabled = false;
+                        elemento.style.cursor = 'pointer';
+                    }
+                });
+
+            } else {
+                // Lógica para liberação completa
+                console.log('🔓 Liberando todos os números para seleção');
+
+                // Esconder overlay
+                const overlay = document.getElementById('overlayBloqueio');
+                if (overlay) {
+                    overlay.style.transition = 'opacity 0.3s ease-out';
+                    overlay.style.opacity = '0';
+                    setTimeout(() => {
+                        overlay.style.display = 'none';
+                    }, 300);
+                }
+
+                // Remover classe de bloqueio
+                const containerNumeros = document.getElementById('containerNumeros');
+                if (containerNumeros) {
+                    containerNumeros.classList.remove('numeros-bloqueados');
+                }
+
+                // ✅ GARANTIR que o botão de comprar está habilitado
+                habilitarBotaoComprar();
+
+                // ✅ HABILITAR botão de seleção aleatória
+                setTimeout(() => {
+                    habilitarBotaoSelecionar();
+                }, 800);
+
+                // Fechar popup de verificação
+                setTimeout(() => {
+                    fecharPopupVerificacao();
+                }, 500);
+            }
+
+        } catch (error) {
+            console.error('❌ Erro ao liberar números:', error);
+            mostrarErroAmigavel('Erro ao liberar números para seleção');
+        }
+    }
+
+    function forcarAtualizacaoVisual() {
+        console.log('🎯 Forçando atualização visual completa');
+
+        // ✅ Verificar se estamos na tela de pagamento
+        const estaTelaAberta = document.getElementById('paymentPopup').style.display === 'block';
+
+        document.querySelectorAll('input[name="numeros"]').forEach(checkbox => {
+            const num = checkbox.value;
+            const label = checkbox.parentElement; // o elemento pai (label)
+            const span = checkbox.nextElementSibling;
+
+            // Determinar estado correto
+            const estaIndisponivel = todosIndisponiveis.includes(num);
+            const estaBloqueado = numerosBloqueados.includes(num);
+            const estaPreReservado = preReservadosGlobal && preReservadosGlobal.includes(num); // se existir
+            const estaCompradoPeloUsuario = numerosCompradosUsuario.includes(num);
+
+            // ✅ USAR A MESMA LÓGICA DA FUNÇÃO PRINCIPAL
+            const estaSelecionado = (selecoesUsuario.includes(num) ||
+                (reservationData && reservationData.numeros && reservationData.numeros.includes(num)))
+                && !estaIndisponivel && !estaBloqueado && !estaPreReservado && !estaCompradoPeloUsuario;
+
+            // Limpar classes do label
+            label.classList.remove('numero-disponivel', 'numero-indisponivel', 'numero-pre-reservado', 'numero-comprado-usuario');
+
+            // ✅ APLICAR ESTADO - NOVA LÓGICA COM PRIORIDADE
+            if (estaCompradoPeloUsuario) {
+                label.classList.add('numero-comprado-usuario');
+                checkbox.disabled = true;
+                checkbox.checked = true;
+            } else if (estaPreReservado) {
+                label.classList.add('numero-pre-reservado');
+                checkbox.disabled = true;
+                checkbox.checked = false;
+            } else if (estaIndisponivel || estaBloqueado) {
+                label.classList.add('numero-indisponivel');
+                checkbox.disabled = true;
+                checkbox.checked = false;
+            } else {
+                label.classList.add('numero-disponivel');
+                checkbox.disabled = false;
+                checkbox.checked = estaSelecionado;
+            }
+
+            // ✅ APLICAR OPACITY SE ESTIVER NA TELA DE PAGAMENTO
+            if (estaSelecionado && estaTelaAberta) {
+                label.style.opacity = '0.5';
+            } else {
+                label.style.opacity = '';
+            }
+
+            // Aplicar classe bloqueado no span
+            if (span) {
+                span.classList.toggle('bloqueado', estaBloqueado);
+            }
+        });
+
+        atualizarTotal();
+    }
+
+    // ✅ MELHORAR: Função mostrarErro para diferenciar tipos de erro
+    function mostrarErro(mensagem, tipo = 'warning') {
+        const erroDiv = document.createElement('div');
+
+        // Definir cores baseadas no tipo
+        let backgroundColor, textColor, borderColor;
+        switch (tipo) {
+            case 'error':
+                backgroundColor = '#ffebee';
+                textColor = '#c62828';
+                borderColor = '#ffcdd2';
+                break;
+            case 'success':
+                backgroundColor = '#d4edda';
+                textColor = '#155724';
+                borderColor = '#c3e6cb';
+                break;
+            default: // warning
+                backgroundColor = '#fff3cd';
+                textColor = '#856404';
+                borderColor = '#ffeaa7';
+        }
+
+        erroDiv.style.cssText = `
+        position: fixed;
+        top: 20px;
+        left: 50%;
+        transform: translateX(-50%);
+        background: ${backgroundColor};
+        color: ${textColor};
+        padding: 15px 25px;
+        border-radius: 8px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        z-index: 2000;
+        max-width: 90%;
+        text-align: center;
+        border: 2px solid ${borderColor};
+    `;
+        erroDiv.innerHTML = `<strong>${tipo === 'error' ? '❌' : tipo === 'success' ? '✅' : '⚠️'} ${tipo === 'error' ? 'Erro' : tipo === 'success' ? 'Sucesso' : 'Atenção'}:</strong> ${mensagem}`;
+        document.body.appendChild(erroDiv);
+
+        setTimeout(() => {
+            if (erroDiv.parentNode) {
+                erroDiv.remove();
+            }
+        }, tipo === 'success' ? 5000 : 20000);
+    }
+
+    function startTimer(duration) {
+        clearInterval(timerInterval);
+        let timer = duration;
+        const countdownElement = document.getElementById('countdownTimer') || document.createElement('div');
+
+        const update = () => {
+            const hours = Math.floor(timer / 3600);
+            const minutes = Math.floor((timer % 3600) / 60);
+            const seconds = timer % 60;
+
+            countdownElement.textContent = `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+
+            if (--timer < 0) {
+                clearInterval(timerInterval);
+                countdownElement.textContent = "TEMPO ESGOTADO!";
+                countdownElement.style.color = '#ff0000';
+            }
+        };
+
+        update();
+        timerInterval = setInterval(update, 1000);
+    }
+
+    // Inicializar quando a página carregar
+    document.addEventListener('DOMContentLoaded', () => {
+        configurarMascaraTelefone();
+        configurarValidacaoNome();
+
+        console.log('DOM carregado, iniciando aplicação...');
+        console.log('UserId criado:', obterIdUsuario());
+
+        const btn = document.getElementById('btn-comprovante');
+        btn.addEventListener('click', confirmarPagamentoComVerificacao);
+
+        const nomeInput = document.querySelector('input[name="nome"]');
+        nomeInput.addEventListener('input', function () {
+            this.value = this.value.replace(/[^\p{L}\s]/gu, '');
+        });
+
+        // MOVER para o final e com delay maior
+        setTimeout(() => {
+            iniciarAtualizacaoPeriodica();
+        }, 1000);
+    });
+
+    // Adicione esta nova função
+    function configurarValidacaoNome() {
+        const nomeInput = document.querySelector('input[name="nome"]');
+
+        nomeInput.addEventListener('input', function () {
+            // Limpe a validação enquanto digita
+            if (this.value.trim().length >= 3) {
+                this.setCustomValidity('');
+            }
+        });
+    }
+
+    // Funções para controlar o botão de compra
+    function habilitarBotaoComprar() {
+        console.log('🔄 Habilitando botão comprar...');
+
+        const btnComprar = document.getElementById('btnComprar');
+        if (btnComprar) {
+            btnComprar.disabled = false;
+            btnComprar.style.opacity = '1';
+            btnComprar.style.cursor = 'pointer';
+            btnComprar.style.background = '#4CAF50';
+            btnComprar.style.boxShadow = '0 4px 6px rgba(0,0,0,0.1)';
+            btnComprar.removeAttribute('data-disabled');
+
+            const erroNumeros = document.getElementById('erroNumeros');
+            if (erroNumeros && erroNumeros.textContent.includes('valide seu número')) {
+                erroNumeros.style.display = 'none';
+            }
+            console.log('✅ Botão Comprar habilitado!');
+        }
+    }
+
+    function desabilitarBotaoComprar() {
+        console.log('🔄 Desabilitando botão comprar (visual)...');
+
+        const btnComprar = document.getElementById('btnComprar');
+        if (btnComprar) {
+            // ✅ NÃO USAR disabled = true
+            btnComprar.disabled = false; // Manter habilitado para receber cliques
+            btnComprar.style.opacity = '0.7';
+            btnComprar.style.cursor = 'not-allowed';
+            btnComprar.style.background = '#ccc';
+            btnComprar.style.boxShadow = '0 2px 4px rgba(0,0,0,0.1)';
+
+            // ✅ MARCAR COMO DESABILITADO COM ATRIBUTO PERSONALIZADO
+            btnComprar.setAttribute('data-disabled', 'true');
+
+            console.log('✅ Botão Comprar desabilitado visualmente!');
+        }
+    }
+
+    document.getElementById('form').addEventListener('submit', function (e) {
+        e.preventDefault(); // ✅ Sempre prevenir submit padrão primeiro
+
+        const btnComprar = document.getElementById('btnComprar');
+
+        // ✅ NOVA VERIFICAÇÃO: Botão visualmente desabilitado?
+        if (btnComprar && btnComprar.getAttribute('data-disabled') === 'true') {
+            console.log('❌ Tentativa de submit com botão desabilitado');
+            document.getElementById('erroNumeros').textContent = '⚠️ Por favor, valide seu número de WhatsApp novamente para outra compra.';
+            document.getElementById('erroNumeros').style.display = 'block';
+            document.getElementById('erroNumeros').style.color = '#ff9800';
+            document.getElementById('erroNumeros').scrollIntoView({ behavior: 'smooth', block: 'center' });
+            return; // ✅ Parar execução aqui
+        }
+
+        // ✅ VERIFICAÇÃO ADICIONAL: Usuário validado? (dupla proteção)
+        if (!dadosUsuario.validado) {
+            console.log('❌ Tentativa de submit sem validação');
+            document.getElementById('erroNumeros').textContent = '⚠️ Por favor, valide seu número de WhatsApp novamente para outra compra.';
+            document.getElementById('erroNumeros').style.display = 'block';
+            document.getElementById('erroNumeros').style.color = '#ff9800';
+            return; // ✅ Parar execução aqui
+        }
+
+        // ✅ LIMPAR AVISO DE VALIDAÇÃO SE PASSOU NAS VERIFICAÇÕES
+        document.getElementById('erroNumeros').style.display = 'none';
+
+        // ✅ PARTIR DAQUI, SEU CÓDIGO ORIGINAL CONTINUA INALTERADO:
+
+        atualizacaoEmAndamento = true;
+        resetarControlesPix();
+
+        const nomeInput = document.querySelector('input[name="nome"]');
+        const nomeValor = nomeInput.value.trim();
+
+        // Validação do nome (sua validação original)
+        if (nomeValor.length < 3) {
+            nomeInput.setCustomValidity('Por favor, insira um nome válido (mínimo 3 caracteres)');
+            nomeInput.reportValidity();
+            atualizacaoEmAndamento = false; // ✅ Resetar flag
+            return;
+        } else if (!/^[\p{L}\s]+$/u.test(nomeValor)) {
+            nomeInput.setCustomValidity('Apenas letras e espaços são permitidos no nome');
+            nomeInput.reportValidity();
+            atualizacaoEmAndamento = false; // ✅ Resetar flag
+            return;
+        } else {
+            nomeInput.setCustomValidity('');
+        }
+
+        // Validação do telefone (sua validação original)
+        const telefoneInput = document.getElementById('telefone');
+        const telefoneNumeros = telefoneInput.value.replace(/\D/g, '');
+
+        if (telefoneNumeros.length < 11) {
+            telefoneInput.setCustomValidity('Por favor, insira um telefone válido.');
+            telefoneInput.reportValidity();
+            atualizacaoEmAndamento = false; // ✅ Resetar flag
+            return;
+        } else {
+            telefoneInput.setCustomValidity('');
+        }
+
+        const formData = new FormData(this);
+        let numerosSelecionados = Array.from(
+            document.querySelectorAll('input[name="numeros"]:checked')
+        ).map(cb => cb.value.padStart(3, '0'));
+
+        // Filtrar números já comprados pelo usuário
+        numerosSelecionados = numerosSelecionados.filter(num =>
+            !numerosCompradosUsuario.includes(num)
+        );
+
+        // ✅ VERIFICAÇÃO DE NÚMEROS (cor vermelha para este tipo de erro)
+        if (numerosSelecionados.length === 0) {
+            console.log('❌ Nenhum número selecionado');
+            document.getElementById('erroNumeros').textContent = 'Por favor, selecione pelo menos um número disponível.';
+            document.getElementById('erroNumeros').style.display = 'block';
+            document.getElementById('erroNumeros').style.color = 'red'; // ✅ Vermelho para erro de seleção
+            atualizacaoEmAndamento = false; // ✅ Resetar flag
+            return;
+        } else {
+            document.getElementById('erroNumeros').style.display = 'none';
+        }
+
+        const selecoesValidas = verificarSelecoesValidas();
+        if (selecoesValidas.length === 0) {
+            mostrarErroAmigavel('Por favor, selecione pelo menos um número disponível.');
+            return;
+        }
+
+        const conflitos = verificarConflitos(numerosSelecionados);
+        if (conflitos.length > 0) {
+            // 1. Remover apenas os números em conflito das seleções do usuário
+            selecoesUsuario = selecoesUsuario.filter(num => !conflitos.includes(num));
+
+            // 2. Atualizar a interface para refletir as mudanças
+            renderNumerosComSelecoes(todosNumeros, todosIndisponiveis, selecoesUsuario);
+
+            // 3. Mostrar mensagem de erro
+            mostrarErroPersonalizado(`Os seguintes números foram reservados enquanto você preenchia o formulário: ${conflitos.join(', ')}. Por favor, selecione outros números.`);
+            fecharPaymentPopup();
+            return;
+        }
+
+        const numerosInvalidos = numerosSelecionados.filter(num => !todosNumeros.includes(num));
+        if (numerosInvalidos.length > 0) {
+            mostrarErroPersonalizado(`Números inválidos selecionados: ${numerosInvalidos.join(', ')}`);
+            return;
+        }
+
+        bloquearNumeros(numerosSelecionados);
+
+        // ✅ NOVA LÓGICA: Buscar código de verificação do cache (múltiplas tentativas)
+        let codigoVerificacao = '';
+        try {
+            // Tentar sessionStorage primeiro (mais seguro)
+            codigoVerificacao = sessionStorage.getItem('codigoVerificacao') || '';
+
+            // Se não encontrar, tentar localStorage
+            if (!codigoVerificacao) {
+                codigoVerificacao = localStorage.getItem('codigoVerificacao') || '';
+            }
+
+            // Se ainda não encontrar, tentar variável global
+            if (!codigoVerificacao && window.codigoVerificacao) {
+                codigoVerificacao = window.codigoVerificacao;
+            }
+
+            console.log('📋 Código recuperado do cache:', codigoVerificacao ? '✅ Encontrado' : '❌ Não encontrado');
+
+        } catch (error) {
+            console.warn('⚠️ Erro ao buscar código do cache:', error);
+            codigoVerificacao = '';
+        }
+
+        // ✅ INCLUIR CÓDIGO NOS DADOS DE RESERVA
+        reservationData = {
+            nome: formData.get('nome').trim(),
+            telefone: formData.get('telefone').trim(),
+            numeros: numerosSelecionados,
+            userId: obterIdUsuario(),
+            codigo: codigoVerificacao
+        };
+
+        // ✅ Se em modo recovery, injetar timestamp original e linhaPendente
+        if (recoveryMode) {
+            reservationData.recoveryTimestamp = recoveryMode.timestampReserva;
+            reservationData.linhaPendenteRecovery = recoveryMode.linhaPendente;
+            console.log('🔄 Recovery mode ativo - usando timestamp:', recoveryMode.timestampReserva);
+            // Remover banner de recovery
+            const banner = document.getElementById('recoveryBanner');
+            if (banner) banner.remove();
+        }
+
+        // ✅ LOG PARA DEBUGGING
+        console.log('📤 Dados sendo enviados para pré-reserva:', {
+            nome: reservationData.nome,
+            telefone: reservationData.telefone,
+            numeros: reservationData.numeros,
+            userId: reservationData.userId,
+            codigo: reservationData.codigo ? '✅ Incluído' : '❌ Vazio'
+        });
+
+        const valorTotal = numerosSelecionados.length * PRECO;
+        document.getElementById('paymentAmount').innerText = valorTotal.toFixed(2);
+        gerarPix(valorTotal, codigoVerificacao); // Passa o código explicitamente
+        document.getElementById('paymentPopup').style.display = 'block';
+
+        // ✅ CONGELAR NÚMEROS APÓS ABRIR O POPUP
+        congelarNumerosParaPagamento(numerosSelecionados);
+
+        // Iniciar verificação de segurança após 15 segundos
+        iniciarVerificacaoSeguranca();
+        pixCopiado = false;
+        pixColado = false;
+        horarioCopia = null;
+        desabilitarInputComprovante();
+        document.getElementById('overlay').style.display = 'block';
+
+        // Atualizar a lista de números no pagamento (já filtrada)
+        const numerosPagamento = document.getElementById('numeros-selecionados-pagamento');
+        if (numerosPagamento) {
+            numerosPagamento.innerHTML = '';
+            reservationData.numeros.forEach(num => {
+                const span = document.createElement('span');
+                span.textContent = num.padStart(3, '0');
+                span.className = 'numero-comprado';
+                numerosPagamento.appendChild(span);
+            });
+        }
+
+        const btnComprovante = document.getElementById('btn-comprovante');
+        btnComprovante.disabled = true;
+        btnComprovante.textContent = 'Reservando...';
+
+        google.script.run
+            .withSuccessHandler(() => {
+                console.log('✅ Pré-reserva realizada com sucesso - Código salvo na planilha');
+                btnComprovante.disabled = false;
+                btnComprovante.textContent = 'Enviar Comprovante';
+                startTimer(24 * 60 * 60);
+            })
+            .withFailureHandler(erro => {
+                console.error('❌ Erro na pré-reserva:', erro);
+                atualizacaoEmAndamento = false;
+                liberarNumeros(numerosSelecionados);
+                renderNumerosComSelecoes(todosNumeros, todosIndisponiveis, selecoesUsuario);
+                mostrarErroPersonalizado(`Falha na pré-reserva: ${erro.message}.`);
+                btnComprovante.disabled = false;
+                btnComprovante.textContent = 'Enviar Comprovante';
+                fecharPaymentPopup();
+            })
+            .reservarNumeros(reservationData); // ✅ AGORA INCLUI O CÓDIGO
+    });
+
+    // ==== NOVA FUNÇÃO: Desabilitar input de comprovante ====
+    function desabilitarInputComprovante() {
+        const comprovanteInput = document.getElementById('comprovanteInput');
+        const btnComprovante = document.getElementById('btn-comprovante');
+
+        comprovanteInput.disabled = true;
+        comprovanteInput.style.opacity = '0.5';
+        comprovanteInput.style.cursor = 'not-allowed';
+        comprovanteInput.addEventListener('click', mostrarMensagemRestricao);
+
+        // ✅ ADICIONAR ESTAS 3 LINHAS:
+        btnComprovante.disabled = true;
+        btnComprovante.style.opacity = '0.5';
+        btnComprovante.style.cursor = 'not-allowed';
+
+        console.log('🔒 Input de comprovante desabilitado');
+    }
+
+    // ==== NOVA FUNÇÃO: Mostrar mensagem de restrição ====
+    function mostrarMensagemRestricao(event) {
+        event.preventDefault();
+
+        console.log('Estado atual:', { pixCopiado, pixColado, horarioCopia });
+
+        // 1ª Verificação: PIX foi copiado?
+        if (!pixCopiado) {
+            mostrarErroPersonalizado('⚠️ Primeiro, copie e faça o PIX para prosseguir');
+            return;
+        }
+
+        // 2ª Verificação: PIX foi colado/usado?
+        if (!pixColado) {
+            mostrarErroPersonalizado('⚠️ Por favor, use o código PIX no seu banco antes de enviar o comprovante');
+            return;
+        }
+
+        // 3ª Verificação: Passou 1 segundo desde que foi detectado o uso?
+        if (horarioCopia) {
+            const tempoDecorrido = Date.now() - horarioCopia;
+            if (tempoDecorrido < 1000) {
+                const segundosRestantes = Math.ceil((1000 - tempoDecorrido) / 1000);
+                mostrarErroPersonalizado(`⏳ Aguarde mais ${segundosRestantes}s para enviar o comprovante`);
+                return;
+            }
+        }
+
+        // Se chegou aqui, liberar o input
+        habilitarInputComprovante();
+    }
+
+    // ==== NOVA FUNÇÃO: Habilitar input de comprovante ====
+    function habilitarInputComprovante() {
+        const comprovanteInput = document.getElementById('comprovanteInput');
+
+        if (comprovanteInput && comprovanteInput.disabled) {
+            comprovanteInput.disabled = false;
+            comprovanteInput.style.opacity = '1';
+            comprovanteInput.style.cursor = 'pointer';
+            comprovanteInput.removeEventListener('click', mostrarMensagemRestricao);
+
+            console.log('✅ Input de comprovante habilitado');
+
+            // ✅ ADICIONAR ESTAS 3 LINHAS:
+            const btnComprovante = document.getElementById('btn-comprovante');
+            btnComprovante.disabled = false;
+            btnComprovante.style.opacity = '1';
+            btnComprovante.style.cursor = 'pointer';
+
+            // Mostrar mensagem de liberação
+            mostrarErroPersonalizado('✅ Agora você pode enviar seu comprovante de pagamento!');
+        }
+    }
+
+    // ==== NOVA FUNÇÃO: Mostrar erro personalizado ====
+    function mostrarErroPersonalizado(mensagem) {
+        // Remover mensagem anterior se existir
+        const mensagemAnterior = document.querySelector('.erro-personalizado');
+        if (mensagemAnterior) {
+            mensagemAnterior.remove();
+        }
+
+        const erroDiv = document.createElement('div');
+        erroDiv.className = 'erro-personalizado';
+        erroDiv.style.cssText = `
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        background: #fff3cd;
+        color: #856404;
+        padding: 20px 30px;
+        border-radius: 8px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        z-index: 10001;
+        max-width: 90%;
+        text-align: center;
+        border: 2px solid #ffeaa7;
+        font-weight: bold;
+        font-size: 16px;
+    `;
+        erroDiv.innerHTML = mensagem;
+        document.body.appendChild(erroDiv);
+
+        setTimeout(() => {
+            if (erroDiv.parentNode) {
+                erroDiv.remove();
+            }
+        }, 10000);
+    }
+
+    function confirmarPagamento() {
+        const btn = document.getElementById('btn-comprovante');
+        const fileInput = document.getElementById('comprovanteInput');
+
+        if (!fileInput.files.length) {
+            alert('❌ Por favor, selecione um comprovante!');
+            return;
+        }
+
+        btn.disabled = true;
+        btn.textContent = '⏳ Validando comprovante...';
+
+        const reader = new FileReader();
+
+        reader.onload = (e) => {
+            const fileData = e.target.result.split(',')[1];
+
+            const dadosComprovante = {
+                ...reservationData,
+                fileName: fileInput.files[0].name,
+                mimeType: fileInput.files[0].type,
+                data: fileData,
+                userId: obterIdUsuario()
+            };
+
+            google.script.run
+                .withSuccessHandler(() => {
+                    // ✅ Reset contador de tentativas em caso de sucesso
+                    tentativasComprovante = 0;
+
+                    // ✅ CORREÇÃO: Evitar duplicação de números comprados
+                    const novosNumeros = reservationData.numeros;
+
+                    // Filtrar apenas números que ainda não estão na lista
+                    const numerosNaoDuplicados = novosNumeros.filter(num =>
+                        !numerosCompradosUsuario.includes(num)
+                    );
+
+                    // Adicionar apenas números não duplicados
+                    numerosCompradosUsuario = [...numerosCompradosUsuario, ...numerosNaoDuplicados];
+
+                    // ✅ Atualizar a exibição
+                    atualizarNumerosComprados(numerosCompradosUsuario);
+
+                    // ✅ CORREÇÃO: Atualizar IMEDIATAMENTE os arrays locais
+                    selecoesUsuario = selecoesUsuario.filter(num =>
+                        !reservationData.numeros.includes(num)
+                    );
+
+                    todosIndisponiveis = [...todosIndisponiveis, ...reservationData.numeros];
+
+                    // ✅ CORREÇÃO: Aplicar estado visual IMEDIATAMENTE
+                    reservationData.numeros.forEach(num => {
+                        const checkbox = document.querySelector(`input[name="numeros"][value="${num}"]`);
+                        if (checkbox) {
+                            const label = checkbox.parentElement;
+
+                            // Remover estados antigos
+                            label.classList.remove('numero-disponivel', 'numero-indisponivel', 'numero-pre-reservado', 'numero-em-pagamento');
+                            // Aplicar estado comprado
+                            label.classList.add('numero-comprado-usuario');
+
+                            // Configurar checkbox
+                            checkbox.disabled = true;
+                            checkbox.checked = true;
+
+                            // Remover opacity de pagamento
+                            label.style.opacity = '';
+                        }
+                    });
+
+                    // ✅ Atualizar displays
+                    atualizarProgresso(todosNumeros.length, todosIndisponiveis.length);
+                    atualizarTotal();
+
+                    // Fechar popup de pagamento
+                    document.getElementById('paymentPopup').style.display = 'none';
+
+                    // ✅ Se era recovery mode, marcar pendente como recuperado
+                    if (reservationData && reservationData.linhaPendenteRecovery) {
+                        google.script.run
+                            .withSuccessHandler(() => console.log('✅ Pendente marcado como Recuperado'))
+                            .withFailureHandler(e => console.warn('⚠️ Erro ao marcar pendente:', e))
+                            .marcarPendenteComoRecuperado({
+                                codigo: reservationData.codigo,
+                                linhaPendente: reservationData.linhaPendenteRecovery
+                            });
+                        recoveryMode = null;
+                    }
+
+                    // Mostrar popup de sucesso
+                    const successMsg = document.getElementById('successMessage');
+                    successMsg.innerHTML = reservationData.numeros.length === 1
+                        ? '🎉 Número reservado com sucesso!'
+                        : `🎉 ${reservationData.numeros.length} números reservados com sucesso!`;
+                    document.getElementById('successPopup').style.display = 'block';
+                    document.getElementById('overlay').style.display = 'block';
+
+                    // ✅ Recarregar dados do servidor
+                    setTimeout(() => carregarDadosRifa(), 2000);
+                    setTimeout(() => carregarDadosRifa(), 5000);
+
+                    // ✅ DESABILITAR BOTÃO APÓS COMPRA CONCLUÍDA
+                    desabilitarBotaoComprar();
+
+                    // ✅ LIMPAR DADOS DE VERIFICAÇÃO PARA FORÇAR NOVA VALIDAÇÃO
+                    dadosUsuario.validado = false;
+                    codigoVerificacao = '';
+                    try {
+                        sessionStorage.removeItem('codigoVerificacao');
+                    } catch (e) {
+                        console.warn('Erro ao limpar código:', e);
+                    }
+
+                    console.log('✅ Compra concluída. Botão comprar desabilitado.');
+                })
+                .withFailureHandler(erro => {
+                    const mensagemErro = erro.message || erro.toString();
+
+                    // Verificar se é erro de validação OCR
+                    if (mensagemErro.includes('COMPROVANTE_INVALIDO') ||
+                        mensagemErro.includes('COMPROVANTE_FALSO') ||
+                        mensagemErro.includes('COMPROVANTE_ERRO')) {
+
+                        tentativasComprovante++;
+                        console.log(`❌ Tentativa ${tentativasComprovante}/${MAX_TENTATIVAS_COMPROVANTE} falhou: ${mensagemErro}`);
+
+                        if (tentativasComprovante >= MAX_TENTATIVAS_COMPROVANTE) {
+                            // 3ª tentativa falhou - cancelar reserva
+                            mostrarErroPersonalizado('❌ Comprovante inválido após 3 tentativas. Sua reserva será cancelada.');
+                            tentativasComprovante = 0; // Reset para próxima vez
+                            // ✅ NOVO: Enviar notificação WhatsApp sobre comprovante inválido
+                            if (reservationData && reservationData.nome && reservationData.telefone) {
+                                google.script.run
+                                    .withSuccessHandler(function (resultado) {
+                                        console.log('📱 Notificação de comprovante inválido enviada:', resultado);
+                                    })
+                                    .withFailureHandler(function (erro) {
+                                        console.error('❌ Erro ao enviar notificação de comprovante inválido:', erro);
+                                    })
+                                    .enviarWhatsAppComprovanteInvalido(
+                                        reservationData.nome,
+                                        reservationData.telefone,
+                                        reservationData.numeros
+                                    );
+                            }
+                            setTimeout(() => {
+                                fecharPaymentPopup();
+                            }, 3000);
+                        } else {
+                            // Permitir nova tentativa
+                            const restantes = MAX_TENTATIVAS_COMPROVANTE - tentativasComprovante;
+
+                            // Extrair apenas o motivo (após os dois pontos)
+                            const motivo = mensagemErro.split(': ').slice(1).join(': ') || 'Comprovante não reconhecido';
+
+                            mostrarErroPersonalizado(
+                                `❌ ${motivo}\n\nPor favor, envie outro comprovante. ` +
+                                `(${restantes} tentativa${restantes > 1 ? 's' : ''} restante${restantes > 1 ? 's' : ''})`
+                            );
+
+                            // Limpar input e reabilitar para nova tentativa
+                            fileInput.value = '';
+                            btn.disabled = false;
+                            btn.textContent = 'Enviar Comprovante';
+                        }
+                    } else {
+                        // Outro tipo de erro (não relacionado a OCR)
+                        mostrarErroPersonalizado(`Erro ao enviar comprovante: ${mensagemErro}`);
+                        btn.disabled = false;
+                        btn.textContent = 'Enviar Comprovante';
+                        fecharPaymentPopup();
+                    }
+                })
+                .salvarComprovante(dadosComprovante);
+        };
+
+        reader.readAsDataURL(fileInput.files[0]);
+    }
+
+    // Função para atualizar números comprados (apenas do usuário atual)
+    function atualizarNumerosComprados(numeros) {
+        // ✅ REMOVER duplicatas antes de atualizar
+        const numerosUnicos = [...new Set(numeros)];
+        numerosCompradosUsuario = numerosUnicos;
+
+        const div = document.getElementById('numerosComprados');
+        if (numerosUnicos.length > 0) {
+            const numerosFormatados = numerosUnicos
+                .sort((a, b) => parseInt(a) - parseInt(b))
+                .map(num => num.padStart(3, '0'))
+                .join(', ');
+
+            div.innerHTML = `${numerosFormatados}`;
+            div.style.color = '#28a745';
+            div.style.fontWeight = 'bold';
+            div.style.marginTop = '10px';
+
+            // ✅ LOG para debugging
+            console.log('✅ Números comprados atualizados:', numerosUnicos);
+        } else {
+            div.innerHTML = 'Nenhum número comprado ainda.';
+            div.style.color = '#666';
+            div.style.fontWeight = 'normal';
+        }
+    }
+
+    // ✅ FUNÇÃO AUXILIAR: Remover duplicatas de qualquer array
+    function removerDuplicatas(array) {
+        return [...new Set(array)];
+    }
+
+    // Usar sempre que atualizar numerosCompradosUsuario
+    numerosCompradosUsuario = removerDuplicatas(numerosCompradosUsuario);
+
+    function fecharPaymentPopup() {
+        console.log('🔄 Fechando popup de pagamento...');
+
+        atualizacaoEmAndamento = false;
+        clearInterval(timerInterval);
+        clearInterval(timerReservaInterval);
+        clearInterval(verificacaoSegurancaInterval);
+
+        inicioReserva = null;
+        resetarControlesPix();
+
+        ultimaAcaoUsuario = Date.now();
+
+        if (reservationData && reservationData.numeros) {
+            console.log('🔄 Cancelando reserva:', reservationData.numeros);
+
+            const dadosCancelamento = {
+                numeros: reservationData.numeros,
+                nome: reservationData.nome || '',
+                telefone: reservationData.telefone || '',
+                userId: reservationData.userId || obterIdUsuario(),
+                codigo: reservationData.codigo || ''
+            };
+
+            // Restaurar seleções
+            reservationData.numeros.forEach(num => {
+                if (!selecoesUsuario.includes(num)) {
+                    selecoesUsuario.push(num);
+                }
+            });
+
+            liberarNumeros(reservationData.numeros);
+            restaurarEstadoNormal();
+
+            document.getElementById('paymentPopup').style.display = 'none';
+            document.getElementById('overlay').style.display = 'none';
+            reservationData = null;
+
+            renderNumerosComSelecoes(todosNumeros, todosIndisponiveis, selecoesUsuario);
+            atualizarTotal();
+
+            // Cancelar no servidor
+            google.script.run
+                .withSuccessHandler((resultado) => {
+                    console.log('✅ Cancelamento confirmado no servidor');
+                    // Refresh rápido após confirmação (500ms é suficiente pois flush já ocorreu no servidor)
+                    setTimeout(() => carregarDadosRifa(), 500);
+                })
+                .withFailureHandler((erro) => {
+                    console.error("❌ Erro no cancelamento:", erro);
+                    setTimeout(() => carregarDadosRifa(), 1000);
+                })
+                .cancelarReserva(dadosCancelamento);
+        } else {
+            document.getElementById('paymentPopup').style.display = 'none';
+            document.getElementById('overlay').style.display = 'none';
+            reservationData = null;
+        }
+
+        clearTimeout(bloqueioTimeout);
+
+        // Restaurar botão de comprovante
+        const btnComprovante = document.getElementById('btn-comprovante');
+        if (btnComprovante) {
+            btnComprovante.disabled = false;
+            btnComprovante.textContent = 'Enviar Comprovante';
+        }
+
+        // Limpar input de comprovante
+        const comprovanteInput = document.getElementById('comprovanteInput');
+        if (comprovanteInput) {
+            comprovanteInput.value = '';
+        }
+
+        // ✅ MANTER VALIDAÇÃO AO CANCELAR PAGAMENTO (não precisa verificar novamente)
+        if (dadosUsuario.validado) {
+            console.log('✅ Cancelamento de pagamento - mantendo validação atual e botão habilitado');
+            habilitarBotaoComprar();
+
+            // ✅ PRESERVAR DADOS DE VALIDAÇÃO NO SESSIONSTORAGE
+            try {
+                sessionStorage.setItem('dadosUsuario', JSON.stringify(dadosUsuario));
+                if (codigoVerificacao) {
+                    sessionStorage.setItem('codigoVerificacao', codigoVerificacao);
+                }
+            } catch (e) {
+                console.warn('Erro ao preservar dados de validação:', e);
+            }
+        } else {
+            console.log('❌ Usuário não validado - mantendo botão desabilitado');
+            desabilitarBotaoComprar();
+        }
+
+        console.log('✅ Popup de pagamento fechado');
+    }
+
+    // Adicionar no início da função:
+    function resetarControlesPix() {
+        console.log('🔄 Resetando controles do PIX para nova compra');
+
+        // Resetar variáveis de controle
+        pixCopiado = false;
+        pixColado = false;
+        horarioCopia = null;
+        inicioLiberacao = null; // ✅ ADICIONAR esta linha
+
+        // Limpar timers
+        if (intervaloPix) {
+            clearInterval(intervaloPix);
+            intervaloPix = null;
+        }
+
+        if (timerLiberacao) {
+            clearTimeout(timerLiberacao);
+            timerLiberacao = null;
+        }
+
+        // Limpar input de comprovante
+        const comprovanteInput = document.getElementById('comprovanteInput');
+        if (comprovanteInput) {
+            comprovanteInput.value = ''; // ✅ ADICIONAR esta linha
+        }
+
+        // Resetar botão de comprovante
+        const btnComprovante = document.getElementById('btn-comprovante');
+        if (btnComprovante) {
+            btnComprovante.disabled = false;
+            btnComprovante.style.opacity = '1';
+            btnComprovante.style.cursor = 'pointer';
+        }
+
+        // ✅ ADICIONAR: Desabilitar o input novamente para nova compra
+        desabilitarInputComprovante();
+
+        console.log('✅ Controles do PIX resetados');
+    }
+
+    // Adicionar verificação antes de processar:
+    function confirmarPagamentoComVerificacao() {
+        const btn = document.getElementById('btn-comprovante');
+        const fileInput = document.getElementById('comprovanteInput');
+
+        // Verificações de segurança (mesma lógica)
+        if (!pixCopiado) {
+            mostrarErroPersonalizado('⚠️ Faça o PIX para prosseguir');
+            return;
+        }
+
+        if (!pixColado) {
+            mostrarErroPersonalizado('⚠️ Por favor, utilize o código PIX no seu banco antes de enviar o comprovante');
+            return;
+        }
+
+        const tempoDecorrido = Date.now() - horarioCopia;
+        if (tempoDecorrido < 1000) {
+            const segundosRestantes = Math.ceil((1000 - tempoDecorrido) / 1000);
+            mostrarErroPersonalizado(`⏳ Aguarde, conferindo pagamento... (${segundosRestantes}s)`);
+            return;
+        }
+
+        // Se passou por todas as verificações, continuar com a função original
+        confirmarPagamento();
+    }
+
+    function forcarAtualizacaoNumeros() {
+        renderNumerosComSelecoes(todosNumeros, todosIndisponiveis, selecoesUsuario, dados.preReservados || []);
+        google.script.run
+            .withSuccessHandler(dados => {
+                if (!dados || !dados.numeros) return;
+
+                todosNumeros = dados.numeros;
+                todosIndisponiveis = dados.indisponiveis || [];
+                const numerosPreReservados = dados.preReservados || []; // ✅ NOVA LINHA
+
+                renderNumerosComSelecoes(todosNumeros, todosIndisponiveis, selecoesUsuario);
+                atualizarProgresso(todosNumeros.length, todosIndisponiveis.length);
+            })
+            .getDadosRifaUsuario(obterIdUsuario()); //
+    }
+
+    function fecharESimRecarregar() {
+        document.getElementById('successPopup').style.display = 'none';
+        document.getElementById('overlay').style.display = 'none';
+
+        // ✅ COMPRA BEM-SUCEDIDA: Limpar validação para forçar nova verificação na próxima compra
+        console.log('🎉 Compra concluída! Limpando validação para próxima compra...');
+
+        // Desabilitar botão comprar (próxima compra precisará de nova validação)
+        desabilitarBotaoComprar();
+
+        // ✅ HABILITAR CONFIRMAR DADOS para nova compra
+        habilitarBotaoConfirmarDados();
+
+        // ✅ LIMPAR COMPLETAMENTE OS DADOS DE VALIDAÇÃO
+        dadosUsuario.validado = false;
+        codigoVerificacao = '';
+
+        // ✅ MANTER APENAS DADOS PESSOAIS PARA CONVENIÊNCIA
+        const nomeAtual = dadosUsuario.nome;
+        const telefoneAtual = dadosUsuario.telefone;
+
+        dadosUsuario = {
+            nome: nomeAtual,
+            telefone: telefoneAtual,
+            validado: false
+        };
+
+        try {
+            // Salvar apenas dados pessoais, sem validação
+            sessionStorage.setItem('dadosUsuario', JSON.stringify(dadosUsuario));
+            // Remover código completamente
+            sessionStorage.removeItem('codigoVerificacao');
+            console.log('🗑️ Validação limpa - dados pessoais mantidos para conveniência');
+        } catch (e) {
+            console.warn('Erro ao atualizar sessionStorage:', e);
+        }
+
+        // Limpar seleção e formulário
+        limparSelecao();
+        document.getElementById('form').reset();
+
+        // ✅ RECOLOCAR DADOS PESSOAIS NO FORMULÁRIO
+        setTimeout(() => {
+            const nomeInput = document.getElementById('nome');
+            const telefoneInput = document.getElementById('telefone');
+
+            if (nomeInput && nomeAtual) {
+                nomeInput.value = nomeAtual;
+            }
+            if (telefoneInput && telefoneAtual) {
+                telefoneInput.value = telefoneAtual;
+            }
+        }, 100);
+
+        selecoesUsuario = [];
+        reservationData = null;
+
+        // Atualizar interface
+        setTimeout(() => {
+            forcarAtualizacaoNumeros();
+            renderNumerosComSelecoes(todosNumeros, todosIndisponiveis, []);
+            atualizarTotal();
+        }, 500);
+
+        console.log('🔄 Compra finalizada. Nova validação será necessária para próxima compra.');
+    }
+
+    function iniciarAtualizacaoPeriodica() {
+        console.log('🔄 Iniciando atualização periódica...');
+
+        // Limpar intervalos e timeouts existentes
+        if (updateInterval) {
+            clearInterval(updateInterval);
+            updateInterval = null;
+        }
+
+        if (updateTimeout) {
+            clearTimeout(updateTimeout);
+            updateTimeout = null;
+        }
+
+        // Carregar dados imediatamente
+        carregarDadosRifa();
+
+        // Configurar atualizações periódicas
+        updateTimeout = setTimeout(() => {
+            carregarDadosRifa();
+
+            // Após primeira atualização, iniciar intervalo regular
+            updateInterval = setInterval(() => {
+                console.log('⏰ Executando atualização periódica...');
+                carregarDadosRifa();
+            }, 2000);
+
+        }, 1000);
+
+        console.log('✅ Atualização periódica configurada');
+    }
+
+    function pararAtualizacaoPeriodica() {
+        console.log('⏹️ Parando atualização periódica...');
+
+        if (updateInterval) {
+            clearInterval(updateInterval);
+            updateInterval = null;
+        }
+
+        if (updateTimeout) {
+            clearTimeout(updateTimeout);
+            updateTimeout = null;
+        }
+
+        // Aguardar operação em andamento terminar
+        if (atualizacaoEmAndamento) {
+            console.log('⏳ Aguardando operação em andamento...');
+            setTimeout(() => {
+                atualizacaoEmAndamento = false;
+            }, 2000);
+        }
+    }
+
+    function forcarLiberacaoComprovante() {
+        console.log('🔧 DEBUG: Forçando liberação do comprovante');
+        pixCopiado = true;
+        pixColado = true;
+        horarioCopia = Date.now() - 61000; // Simular que passou mais de 60s
+        habilitarInputComprovante();
+    }
+
+    function verificarStatusAtualizacao() {
+        console.log('📊 Status da atualização:');
+        console.log('- Em andamento:', atualizacaoEmAndamento);
+        console.log('- Interval ativo:', !!updateInterval);
+        console.log('- Timeout ativo:', !!updateTimeout);
+        console.log('- Limpeza ativa:', limparSelecaoAtiva);
+    }
+    function mostrarPopup(popupName) {
+        document.getElementById('overlay').style.display = 'block';
+        document.querySelectorAll('.popup').forEach(popup => popup.style.display = 'none');
+
+        const popupId = 'popup' + popupName;
+        const popup = document.getElementById(popupId);
+        if (popup) popup.style.display = 'block';
+    }
+
+    function fecharPopup() {
+        document.querySelectorAll('.popup').forEach(popup => popup.style.display = 'none');
+        document.getElementById('overlay').style.display = 'none';
+    }
+
+    // NOVA FUNÇÃO: Atualizar os números selecionados
+    function atualizarNumerosSelecionados() {
+        const divNumeros = document.getElementById('numerosSelecionados');
+        if (selecoesUsuario.length > 0) {
+            divNumeros.innerHTML = selecoesUsuario.map(num => num.padStart(3, '0')).join(', ');
+        } else {
+            divNumeros.innerHTML = 'Nenhum número selecionado';
+        }
+    }
+
+    function limparSelecao() {
+        limparSelecoesAtuais();
+        // ✅ NÃO resetar o formulário completamente aqui
+        // para manter dados do usuário para próxima compra
+    }
+
+    function limparSelecoesAtuais() {
+        console.log('🧹 Limpando apenas seleções atuais');
+
+        ultimaAcaoUsuario = Date.now();
+        selecoesUsuario = [];
+
+        document.querySelectorAll('input[name="numeros"]').forEach(checkbox => {
+            if (!numerosCompradosUsuario.includes(checkbox.value)) {
+                checkbox.checked = false;
+            }
+        });
+
+        atualizarTotal();
+        atualizarNumerosSelecionados();
+        document.getElementById('erroNumeros').style.display = 'none';
+
+        console.log('✅ Seleções atuais limpas. Números comprados mantidos.');
+    }
+
+    function atualizarProgresso(totalNumeros, numerosReservados) {
+        if (totalNumeros === 0) return;
+
+        const porcentagem = (numerosReservados / totalNumeros) * 100;
+        const progressBar = document.getElementById('progressBar');
+
+        if (progressBar) {
+            progressBar.style.width = porcentagem + '%';
+            document.getElementById('progressText').textContent =
+                `${porcentagem.toFixed(1)}% reservados (${numerosReservados}/${totalNumeros})`;
+        }
+    }
+
+    window.addEventListener('beforeunload', function (e) {
+        pararAtualizacaoPeriodica();
+
+        if (reservationData) {
+            // Cancelar apenas se ainda estiver no processo de pagamento
+            if (document.getElementById('paymentPopup').style.display === 'block') {
+                google.script.run
+                    .withFailureHandler(erro => console.error('Erro ao cancelar:', erro))
+                    .cancelarReserva(reservationData);
+            }
+        }
+    });
+
+    // ADICIONAR esta função no JavaScript
+    function selecionarAleatorio() {
+        // ✅ VERIFICAR SE BOTÃO ESTÁ HABILITADO
+        const botaoSelecionar = document.getElementById('botaoSelecionar');
+        if (botaoSelecionar && botaoSelecionar.disabled) {
+            alert('⏳ Complete a verificação primeiro para liberar a seleção de números');
+            return;
+        }
+
+        const quantidade = parseInt(document.getElementById('quantidadeAleatoria').value);
+
+        if (!quantidade || quantidade < 1) {
+            alert('Digite uma quantidade válida (mínimo 1)');
+            return;
+        }
+
+        // ✅ CORREÇÃO: Limpar visualmente e logicamente antes de selecionar
+        limparSelecoesAtuais();
+
+        // Obter números disponíveis (não reservados e não bloqueados)
+        const numerosDisponiveis = todosNumeros.filter(num =>
+            !todosIndisponiveis.includes(num) &&
+            !numerosBloqueados.includes(num) &&
+            !numerosCompradosUsuario.includes(num)
+        );
+
+        if (numerosDisponiveis.length === 0) {
+            alert('Não há números disponíveis para seleção');
+            return;
+        }
+
+        if (quantidade > numerosDisponiveis.length) {
+            alert(`Apenas ${numerosDisponiveis.length} números disponíveis`);
+            return;
+        }
+
+        // Marcar timestamp da ação do usuário
+        ultimaAcaoUsuario = Date.now();
+
+        // Selecionar aleatoriamente
+        const numerosAleatorios = [];
+        const disponivelCopia = [...numerosDisponiveis];
+
+        for (let i = 0; i < quantidade; i++) {
+            const indiceAleatorio = Math.floor(Math.random() * disponivelCopia.length);
+            const numeroSelecionado = disponivelCopia[indiceAleatorio];
+            numerosAleatorios.push(numeroSelecionado);
+            disponivelCopia.splice(indiceAleatorio, 1);
+        }
+
+        // Adicionar às seleções do usuário
+        selecoesUsuario.push(...numerosAleatorios);
+
+        // Atualizar interface
+        renderNumerosComSelecoes(todosNumeros, todosIndisponiveis, selecoesUsuario);
+        atualizarTotal();
+
+        console.log(`✅ Selecionados ${quantidade} números aleatórios:`, numerosAleatorios);
+    }
+
+    function inicializarPagina() {
+        const jaNumerosLiberados = dadosUsuario && dadosUsuario.validado;
+
+        if (jaNumerosLiberados) {
+            habilitarBotaoSelecionar();
+            console.log('🚀 Página inicializada - Números já liberados');
+        } else {
+            desabilitarBotaoSelecionar();
+            console.log('🚀 Página inicializada - Aguardando liberação dos números');
+        }
+    }
+
+    function iniciarTimerVisual() {
+        // Marcar o momento exato do início da reserva
+        inicioReserva = Date.now();
+        const timerElement = document.getElementById('timerReserva');
+
+        clearInterval(timerReservaInterval);
+
+        // Atualizar imediatamente
+        atualizarTimer();
+
+        // Atualizar a cada segundo
+        timerReservaInterval = setInterval(atualizarTimer, 1000);
+    }
+
+    function atualizarTimer() {
+        if (!inicioReserva) return;
+
+        const agora = Date.now();
+        const tempoDecorrido = agora - inicioReserva;
+        const tempoRestante = Math.max(0, duracaoReserva - tempoDecorrido);
+
+        const timerElement = document.getElementById('timerReserva');
+
+        if (tempoRestante <= 0) {
+            clearInterval(timerReservaInterval);
+            timerElement.textContent = 'EXPIRADO!';
+            timerElement.style.color = '#d63031';
+
+            // Opcional: Fechar automaticamente se expirou
+            setTimeout(() => {
+                if (document.getElementById('paymentPopup').style.display === 'block') {
+                    // ✅ NOVO: Enviar notificação WhatsApp sobre expiração
+                    if (reservationData && reservationData.nome && reservationData.telefone) {
+                        google.script.run
+                            .withSuccessHandler(function (resultado) {
+                                console.log('📱 Notificação de reserva expirada enviada (timer visual):', resultado);
+                            })
+                            .withFailureHandler(function (erro) {
+                                console.error('❌ Erro ao enviar notificação de expiração (timer visual):', erro);
+                            })
+                            .enviarWhatsAppReservaExpirada(
+                                reservationData.nome,
+                                reservationData.telefone,
+                                reservationData.numeros
+                            );
+                    }
+                    fecharPaymentPopup();
+                    mostrarErroPersonalizado('⏰ Tempo para pagamento expirado. Por favor, tente novamente.');
+                }
+            }, 1000);
+
+            return;
+        }
+
+        const segundosRestantes = Math.ceil(tempoRestante / 1000);
+        const minutos = Math.floor(segundosRestantes / 60);
+        const segundos = segundosRestantes % 60;
+
+        timerElement.textContent = `${minutos}:${segundos.toString().padStart(2, '0')}`;
+
+        // Mudar cor quando restam 2 minutos (120 segundos)
+        if (segundosRestantes <= 120) {
+            timerElement.style.color = '#d63031';
+            timerElement.style.fontWeight = 'bold';
+        } else {
+            timerElement.style.color = '#e17055';
+            timerElement.style.fontWeight = 'bold';
+        }
+    }
+
+    document.addEventListener('visibilitychange', function () {
+        if (!document.hidden && inicioReserva) {
+            // Página voltou a ter foco - verificar se ainda é válido
+            const agora = Date.now();
+            const tempoDecorrido = agora - inicioReserva;
+
+            if (tempoDecorrido >= duracaoReserva) {
+                // Timer já expirou enquanto estava em outra aba
+                clearInterval(timerReservaInterval);
+                const timerElement = document.getElementById('timerReserva');
+                if (timerElement) {
+                    timerElement.textContent = 'EXPIRADO!';
+                    timerElement.style.color = '#d63031';
+                }
+
+                // Fechar popup se ainda estiver aberto
+                if (document.getElementById('paymentPopup').style.display === 'block') {
+                    // ✅ NOVO: Enviar notificação WhatsApp sobre expiração em outra aba
+                    if (reservationData && reservationData.nome && reservationData.telefone) {
+                        google.script.run
+                            .withSuccessHandler(function (resultado) {
+                                console.log('📱 Notificação de reserva expirada enviada (outra aba):', resultado);
+                            })
+                            .withFailureHandler(function (erro) {
+                                console.error('❌ Erro ao enviar notificação de expiração (outra aba):', erro);
+                            })
+                            .enviarWhatsAppReservaExpirada(
+                                reservationData.nome,
+                                reservationData.telefone,
+                                reservationData.numeros
+                            );
+                    }
+                    fecharPaymentPopup();
+                    mostrarErroPersonalizado('⏰ Tempo para pagamento expirado enquanto você estava em outra aba.');
+                }
+            } else {
+                // Ainda válido - forçar atualização imediata
+                atualizarTimer();
+            }
+        }
+
+        // ✅ NOVA VERIFICAÇÃO: Timer de liberação do comprovante
+        if (!document.hidden && inicioLiberacao) {
+            const agora = Date.now();
+            const tempoDecorrido = agora - inicioLiberacao;
+
+            if (tempoDecorrido >= 45000) {
+                // Timer de liberação já expirou enquanto estava em outra aba
+                clearTimeout(timerLiberacao);
+                console.log('✅ Timer de liberação expirou em outra aba, liberando agora');
+                habilitarInputComprovante();
+            }
+        }
+    });
+
+    // Nova função: só bloqueia no modo RETRATO do mobile
+    function isMobilePortrait() {
+        return (window.innerWidth <= 1024 && window.innerHeight > window.innerWidth) ||
+            (/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) &&
+                window.innerHeight > window.innerWidth);
+    }
+
+    function isMobile() {
+        return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ||
+            ('ontouchstart' in window) ||
+            (navigator.maxTouchPoints > 0);
+    }
+
+    // Função para mostrar tooltip mobile
+    function showMobileTooltip(element, text, event) {
+        // Se já está mostrando tooltip para o mesmo elemento, remove
+        if (currentActiveItem === element) {
+            removeCurrentTooltip();
+            return;
+        }
+
+        // Remove tooltip anterior
+        removeCurrentTooltip();
+
+        // Marca o elemento como ativo
+        currentActiveItem = element;
+        element.classList.add('active');
+
+        // Cria novo tooltip
+        currentTooltip = document.createElement('div');
+        currentTooltip.className = 'tooltip-mobile';
+        currentTooltip.textContent = text;
+        document.body.appendChild(currentTooltip);
+
+        // Aguarda o tooltip ser renderizado
+        setTimeout(() => {
+            if (!currentTooltip) return;
+
+            // POSIÇÃO FIXA: sempre no mesmo lugar da tela
+            const tooltipWidth = currentTooltip.offsetWidth;
+
+            // Centraliza horizontalmente na tela
+            let left = (window.innerWidth / 2) + 200;
+
+            // Posição fixa no topo (sempre a mesma altura)
+            let top = 800; // 200px do topo (mais embaixo)
+
+            // Aplica as posições
+            currentTooltip.style.left = left + 'px';
+            currentTooltip.style.top = top + 'px';
+
+            // Mostra o tooltip
+            currentTooltip.classList.add('show');
+        }, 10);
+
+        // Remove após 4 segundos
+        tooltipTimeout = setTimeout(() => {
+            removeCurrentTooltip();
+        }, 4000);
+    }
+
+    // Função para esconder tooltip
+    function removeCurrentTooltip() {
+        if (currentTooltip) {
+            currentTooltip.classList.remove('show');
+            setTimeout(() => {
+                if (currentTooltip && currentTooltip.parentNode) {
+                    currentTooltip.remove();
+                }
+                currentTooltip = null;
+            }, 300);
+        }
+
+        if (currentActiveItem) {
+            currentActiveItem.classList.remove('active');
+            currentActiveItem = null;
+        }
+
+        if (tooltipTimeout) {
+            clearTimeout(tooltipTimeout);
+            tooltipTimeout = null;
+        }
+    }
+
+    // Inicializa os tooltips quando o DOM estiver carregado
+    document.addEventListener('DOMContentLoaded', function () {
+        const tooltipItems = document.querySelectorAll('.tooltip-item');
+
+        tooltipItems.forEach(item => {
+            const tooltipText = item.getAttribute('data-tooltip');
+
+            if (isMobile()) {
+                // Mobile: usar touchend em vez de touchstart
+                item.addEventListener('touchend', function (e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    showMobileTooltip(this, tooltipText, e);
+                });
+
+                // Previne o comportamento padrão no touchstart
+                item.addEventListener('touchstart', function (e) {
+                    e.preventDefault();
+                });
+            } else {
+                // Desktop: hover tradicional
+                item.title = tooltipText;
+            }
+        });
+
+        // Remove tooltip ao tocar em qualquer lugar da tela
+        document.addEventListener('touchend', function (e) {
+            // Verifica se o toque foi fora dos itens de tooltip
+            const isTooltipItem = e.target.closest('.tooltip-item');
+            if (!isTooltipItem) {
+                removeCurrentTooltip();
+            }
+        });
+
+        // Remove tooltip ao fazer scroll
+        window.addEventListener('scroll', function () {
+            removeCurrentTooltip();
+        });
+
+        // Remove tooltip ao redimensionar a tela
+        window.addEventListener('resize', function () {
+            removeCurrentTooltip();
+        });
+    });
+
+    function scrollDown() {
+        if (isMobilePortrait()) return;
+
+        const isMobileLandscape = window.innerWidth <= 1024 && window.innerWidth > window.innerHeight;
+        const scrollAmount = isMobileLandscape ? window.innerHeight * 1.5 : window.innerHeight;
+
+        window.scrollBy({
+            top: scrollAmount,
+            behavior: 'smooth'
+        });
+
+        setTimeout(checkButtonsVisibility, 500);
+    }
+
+    function scrollToTop() {
+        if (isMobilePortrait()) return;
+
+        window.scrollTo({
+            top: 0,
+            behavior: 'smooth'
+        });
+
+        setTimeout(checkButtonsVisibility, 500);
+    }
+
+    function checkButtonsVisibility() {
+        if (isMobilePortrait()) return;
+
+        const scrollDownBtn = document.getElementById('scrollDownBtn');
+        const scrollUpBtn = document.getElementById('scrollUpBtn');
+
+        if (!scrollDownBtn || !scrollUpBtn) return;
+
+        const scrollPosition = window.pageYOffset || document.documentElement.scrollTop;
+        const windowHeight = window.innerHeight;
+        const documentHeight = Math.max(
+            document.body.scrollHeight,
+            document.body.offsetHeight,
+            document.documentElement.clientHeight,
+            document.documentElement.scrollHeight,
+            document.documentElement.offsetHeight
+        );
+
+        const distanciaDoFinal = documentHeight - (scrollPosition + windowHeight);
+        const isMobileLandscape = window.innerWidth <= 1024 && window.innerWidth > window.innerHeight;
+
+        // CORREÇÃO: Margem maior para garantir que os botões Comprar/Limpar sejam vistos
+        const limiteEsconder = isMobileLandscape ? 5 : 100;
+
+        if (distanciaDoFinal <= limiteEsconder) {
+            scrollDownBtn.classList.add('hidden');
+        } else {
+            scrollDownBtn.classList.remove('hidden');
+        }
+
+        if (scrollPosition > 200) {
+            scrollUpBtn.classList.add('show');
+        } else {
+            scrollUpBtn.classList.remove('show');
+        }
+    }
+
+    function startContinuousMonitoring() {
+        if (continuousMonitor) {
+            clearInterval(continuousMonitor);
+        }
+
+        const isMobileLandscape = window.innerWidth <= 1024 && window.innerWidth > window.innerHeight;
+
+        if (isMobileLandscape) {
+            // Verifica a cada 100ms se houve mudança na posição de scroll
+            continuousMonitor = setInterval(() => {
+                const currentScroll = window.pageYOffset || document.documentElement.scrollTop;
+                if (currentScroll !== lastScrollPosition) {
+                    lastScrollPosition = currentScroll;
+                    checkButtonsVisibility();
+                }
+            }, 100);
+        }
+    }
+
+    // Múltiplos event listeners para capturar todos os tipos de scroll
+    function addAllScrollListeners() {
+        const events = [
+            'scroll', 'touchstart', 'touchmove', 'touchend',
+            'wheel', 'mousewheel', 'DOMMouseScroll'
+        ];
+
+        events.forEach(event => {
+            window.addEventListener(event, () => {
+                if (!isMobilePortrait()) {
+                    setTimeout(checkButtonsVisibility, 50);
+                }
+            }, { passive: true });
+
+            document.addEventListener(event, () => {
+                if (!isMobilePortrait()) {
+                    setTimeout(checkButtonsVisibility, 50);
+                }
+            }, { passive: true });
+        });
+    }
+
+    document.addEventListener('DOMContentLoaded', function () {
+        if (!isMobilePortrait()) {
+            // Múltiplos listeners
+            addAllScrollListeners();
+
+            // Monitoramento contínuo
+            startContinuousMonitoring();
+
+            // Observer para mudanças no DOM que possam afetar altura
+            if (window.MutationObserver) {
+                const observer = new MutationObserver(() => {
+                    setTimeout(checkButtonsVisibility, 100);
+                });
+                observer.observe(document.body, {
+                    childList: true,
+                    subtree: true,
+                    attributes: true
+                });
+            }
+
+            // Monitora mudança de orientação
+            window.addEventListener('resize', () => {
+                setTimeout(() => {
+                    if (isMobilePortrait()) {
+                        if (continuousMonitor) {
+                            clearInterval(continuousMonitor);
+                            continuousMonitor = null;
+                        }
+                    } else {
+                        startContinuousMonitoring();
+                        checkButtonsVisibility();
+                    }
+                }, 100);
+            });
+
+            window.addEventListener('beforeunload', function (e) {
+                if (reservationData && reservationData.numeros) {
+                    console.log('🚪 Página sendo fechada - cancelando reserva...');
+
+                    const dadosCancelamento = {
+                        numeros: reservationData.numeros,
+                        nome: reservationData.nome || '',
+                        telefone: reservationData.telefone || '',
+                        userId: reservationData.userId || obterIdUsuario(),
+                        codigo: reservationData.codigo || ''
+                    };
+
+                    // Usar navigator.sendBeacon para garantir que a requisição seja enviada
+                    const dados = JSON.stringify(dadosCancelamento);
+                    navigator.sendBeacon('/cancelarReserva', dados);
+
+                    // Ou usar chamada síncrona como backup
+                    google.script.run.cancelarReserva(dadosCancelamento);
+                }
+            });
+
+            // Verificação inicial
+            setTimeout(checkButtonsVisibility, 500);
+        }
+    });
+
+    // Força verificação a cada 2 segundos como backup
+    setInterval(() => {
+        if (!isMobilePortrait()) {
+            checkButtonsVisibility();
+        }
+    }, 200);
+
+    function verificarEstadoAtual() {
+        console.log('🔍 Estado atual:', {
+            botaoHabilitado: !document.getElementById('btnComprar')?.disabled,
+            usuarioValidado: dadosUsuario.validado,
+            codigoExiste: !!codigoVerificacao,
+            dadosSessionStorage: !!sessionStorage.getItem('dadosUsuario')
+        });
+    }
+
+</script>
