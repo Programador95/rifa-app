@@ -1,0 +1,108 @@
+<!-- RecoveryPopup.html — Fluxo de recuperação completo -->
+<!-- Requer que o usuário já esteja validado (nome + WhatsApp confirmados na home) -->
+<div id="recoveryPopup" class="popup" style="display:none;">
+  <h3>🔄 Recuperar Reserva Pendente</h3>
+  <!-- ETAPA 1: Buscar por código -->
+  <div id="recoveryStep1" style="text-align:center;">
+    <p style="color:#555;margin-bottom:24px;font-size:15px;">Informe o código de 6 dígitos recebido no WhatsApp:</p>
+    <div style="margin-bottom:28px;">
+      <input type="text" id="recoveryCodigo" maxlength="6" placeholder="000000" inputmode="numeric"
+        style="width:100%;max-width:280px;padding:18px 16px;border-radius:12px;
+               border:2px solid var(--border-color);font-size:36px;text-align:center;
+               letter-spacing:12px;font-weight:bold;display:block;margin:0 auto;
+               transition:border-color 0.2s ease;outline:none;"
+        onfocus="this.style.borderColor='#28a745'"
+        onblur="this.style.borderColor='var(--border-color)'">
+    </div>
+    <div class="popup-buttons" style="justify-content:center;">
+      <button class="popup-button primary" onclick="buscarReservaPendente()">🔍 Buscar</button>
+      <button class="popup-button secondary" onclick="cancelarModoRecovery()">Cancelar</button>
+    </div>
+    <div id="recoveryErro" style="display:none;color:#c62828;margin-top:12px;text-align:center;font-size:14px;"></div>
+  </div>
+  <!-- ETAPA 2: Confirmar dados encontrados -->
+  <div id="recoveryStep2" style="display:none;">
+    <div style="background:var(--card-bg,#f9f9f9);border-radius:8px;padding:12px;margin-bottom:12px;font-size:14px;">
+      <p style="margin:4px 0;"><strong>Nome:</strong> <span id="recoveryNome"></span></p>
+      <p style="margin:4px 0;"><strong>Telefone:</strong> <span id="recoveryTelDisplay"></span></p>
+      <p style="margin:4px 0;"><strong>Números originais:</strong>
+        <span id="recoveryNumeros" style="color:#28a745;font-weight:bold;"></span></p>
+      <p style="margin:4px 0;"><strong>Valor:</strong> R$ <span id="recoveryValor"></span></p>
+      <p style="margin:4px 0;font-size:12px;color:#666;"><strong>Motivo:</strong>
+        <span id="recoveryMotivo"></span></p>
+    </div>
+    <div id="recoveryDisponibilidade" style="margin-bottom:12px;padding:10px;border-radius:8px;"></div>
+    <!-- Opções quando números estão disponíveis -->
+    <div id="recoveryOpcoes" style="display:none;margin-bottom:12px;">
+      <p style="font-size:14px;font-weight:bold;margin-bottom:8px;">O que deseja fazer?</p>
+      <div style="display:flex;flex-direction:column;gap:8px;">
+        <button class="popup-button primary" onclick="confirmarRecuperacaoMesmosNumeros()" id="btnMesmosNumeros">
+          ✅ Manter os mesmos números
+        </button>
+        <button class="popup-button secondary" onclick="confirmarRecuperacaoNovosNumeros()">
+          🔄 Escolher novos números
+        </button>
+      </div>
+    </div>
+    <!-- Quando todos os números estão ocupados -->
+    <div id="recoveryNovosObrigatorio" style="display:none;margin-bottom:12px;">
+      <p style="font-size:13px;color:#856404;background:#fff3cd;border-radius:8px;padding:10px;">
+        ⚠️ Seus números originais não estão mais disponíveis. Você poderá escolher novos números na grade.
+      </p>
+      <button class="popup-button primary" onclick="confirmarRecuperacaoNovosNumeros()" style="width:100%;margin-top:8px;">
+        🔄 Escolher novos números
+      </button>
+    </div>
+    <div class="popup-buttons" style="margin-top:8px;">
+      <button class="popup-button secondary" onclick="voltarStep1Recovery()">Voltar</button>
+    </div>
+  </div>
+  <!-- ETAPA 3: Popup de pagamento da recuperação (mesmos números) -->
+  <div id="recoveryStep3Payment" style="display:none;">
+    <div style="background:var(--card-bg,#f9f9f9);border-radius:8px;padding:12px;margin-bottom:12px;">
+      <h4 style="margin:0 0 8px 0;">📋 Números Recuperados:</h4>
+      <div id="recoveryNumerosConfirmados" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px;"></div>
+      <div style="display:flex;justify-content:space-between;align-items:center;">
+        <div>
+          <h4 style="margin:0;">Valor Total</h4>
+          <p style="margin:4px 0;font-size:18px;font-weight:bold;">R$ <span id="recoveryValorTotal"></span></p>
+        </div>
+        <div>
+          <strong>Código:</strong> <span id="recoveryCodigoDisplay" style="font-family:monospace;font-size:16px;"></span>
+        </div>
+      </div>
+    </div>
+    <div class="timer-container" style="text-align:center;margin-bottom:12px;">
+      <strong>⏰ Tempo restante:</strong>
+      <span id="timerRecovery" style="font-size:20px;font-weight:bold;color:#c62828;">10:00</span>
+    </div>
+    <div class="payment-instructions" style="background:#e8f5e9;border-radius:8px;padding:10px;margin-bottom:12px;font-size:13px;">
+      <h4 style="margin:0 0 6px 0;">Instruções:</h4>
+      <ol style="margin:0;padding-left:20px;">
+        <li>Você já realizou o PIX anteriormente</li>
+        <li>Localize o comprovante no seu celular</li>
+        <li>Envie o comprovante no campo abaixo</li>
+        <li>Aguarde a verificação automática</li>
+      </ol>
+    </div>
+    <input type="file" id="recoveryComprovanteInput"
+      accept="image/jpeg,image/jpg,image/png,image/gif,image/bmp,application/pdf" required
+      style="width:100%;margin-bottom:14px;">
+    <p style="font-size:14px;color:#666;margin-bottom:14px;">
+      <strong>Atenção:</strong> Os números só serão confirmados após validação do comprovante.
+      Comprovante inválido = números liberados.
+    </p>
+    <div class="popup-buttons">
+      <button id="btnRecoveryComprovante" type="button" class="popup-button primary"
+        onclick="enviarComprovanteRecovery()">
+        Enviar Comprovante
+      </button>
+      <button class="popup-button secondary" onclick="cancelarRecoveryPayment()">Cancelar</button>
+    </div>
+  </div>
+  <!-- ETAPA Loading -->
+  <div id="recoveryStepLoading" style="display:none;text-align:center;padding:30px;">
+    <div class="loading-spinner" style="margin:0 auto 15px;"></div>
+    <p id="recoveryLoadingMsg">Buscando reserva...</p>
+  </div>
+</div>

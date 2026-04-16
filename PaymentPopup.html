@@ -1,0 +1,103 @@
+<div id="paymentPopup" class="popup">
+    <h3>💳 Pagamento via PIX</h3>
+
+    <div class="pix-info">
+
+        <!-- Resumo da compra -->
+        <div class="payment-summary">
+            <div class="resumo-compra">
+                <h4>📋 Números Selecionados:</h4>
+                <div id="numeros-selecionados-pagamento" class="numeros-lista"></div>
+            </div>
+            <div>
+                <h4>Valor Total</h4>
+                <p>R$ <span id="paymentAmount"></span></p>
+            </div>
+        </div>
+
+        <!-- Timer -->
+        <div class="timer-container">
+            <strong>⏰ Tempo restante:</strong>
+            <span id="timerReserva">10:00</span>
+        </div>
+
+        <!-- BANNER WHATSAPP -->
+        <div id="waBanner" class="wa-banner" style="display:none;">
+            <div class="wa-banner-icon">📲</div>
+            <div class="wa-banner-text">
+                <strong>Código PIX enviado no seu WhatsApp!</strong>
+                <span>Copie o código de lá, pague no seu banco e envie o comprovante pelo mesmo WhatsApp.</span>
+            </div>
+            <button class="wa-resend-btn" onclick="reenviarPixWhatsApp()" id="btnReenviarPix">
+                🔁 Reenviar
+            </button>
+        </div>
+
+        <!-- CÓDIGO PIX -->
+        <div class="pix-code" id="pixCopiaCola"></div>
+        <button class="copy-pix-btn" onclick="copiarPixDinamico(this)" id="btnCopiarPix">
+            Copiar Código PIX
+        </button>
+
+        <!-- INSTRUÇÕES -->
+        <div class="payment-instructions">
+            <h4>Como pagar:</h4>
+            <ol>
+                <li>Abra o WhatsApp e copie o <strong>Código PIX</strong> que enviamos</li>
+                <li>Acesse o APP do seu banco → PIX → Copia e Cola</li>
+                <li>Cole o código e conclua o pagamento</li>
+                <li>Após pagar, <strong>envie o comprovante nesse mesmo WhatsApp</strong> 📸</li>
+            </ol>
+            <p class="instrucao-alt">Ou copie o código acima direto daqui e envie o comprovante pelo site.</p>
+        </div>
+
+        <!-- ÁREA DE STATUS DO WEBHOOK (polling) -->
+        <div id="waStatusArea" class="wa-status-area" style="display:none;">
+            <div class="wa-status-inner">
+                <span id="waStatusIcon">⏳</span>
+                <span id="waStatusText">Aguardando comprovante...</span>
+            </div>
+            <div id="waStatusBar" class="wa-status-bar">
+                <div id="waStatusBarFill" class="wa-status-bar-fill"></div>
+            </div>
+        </div>
+
+        <!-- UPLOAD PELO SITE (fallback) -->
+        <div id="uploadSiteSection" style="display:none;" class="upload-fallback-section">
+            <p class="upload-fallback-label">📎 Enviar comprovante pelo site:</p>
+            <input type="file" id="comprovanteInput"
+                accept="image/jpeg,image/jpg,image/png,image/gif,image/bmp,application/pdf">
+        </div>
+
+    </div>
+
+    <p class="aviso-reserva">
+        <strong>Atenção:</strong> Os números só serão reservados após validação do comprovante.
+        <span>Comprovante inválido = números liberados.</span>
+    </p>
+
+    <!-- BOTÕES -->
+    <div class="popup-buttons popup-buttons-wa">
+
+        <button id="btn-ja-enviei" type="button" class="popup-button primary wa-primary-btn"
+            onclick="jaEnvieiComprovanteWH()" style="display:none;">
+            ✅ Já Enviei o Comprovante
+        </button>
+
+        <!-- mantido para o fluxo de upload pelo site -->
+        <button id="btn-comprovante" type="button" class="popup-button primary" style="display:none;">
+            Enviar Comprovante
+        </button>
+
+        <button id="btn-toggle-upload" type="button" class="popup-button secondary wa-secondary-btn"
+            onclick="alternarUploadSite()" style="display:none;">
+            📎 Prefiro enviar pelo site
+        </button>
+
+        <button class="popup-button secondary"
+            onclick="fecharPaymentPopup(); forcarAtualizacaoNumeros();">
+            Cancelar
+        </button>
+
+    </div>
+</div>

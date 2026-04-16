@@ -1,0 +1,22 @@
+<!-- Header compacto: título + ações em uma linha, menu abaixo -->
+<div class="site-header">
+  <div class="header-top">
+    <h2>🎟️ Rifa Online</h2>
+    <div class="header-actions">
+      <button class="dark-mode-toggle" onclick="toggleDarkMode()">
+        <span class="icon-dark">🌙</span>
+        <span class="icon-light">☀️</span>
+        <span class="dark-mode-label">Modo Noturno</span>
+      </button>
+      <button type="button" id="btnRecovery" class="btn-recovery-header" onclick="abrirRecoveryPopup()"
+        title="Recuperar uma reserva pendente anterior">
+        🔄 Recuperar Reserva
+      </button>
+    </div>
+  </div>
+  <nav class="top-menu">
+    <div class="menu-item" onclick="mostrarPopup('Sorteio')">🎥 Como Funciona</div>
+    <div class="menu-item" onclick="mostrarPopup('Data')">📅 Data do Sorteio</div>
+    <div class="menu-item" onclick="mostrarPopup('Regras')">📜 Regras</div>
+  </nav>
+</div>

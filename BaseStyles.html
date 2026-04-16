@@ -1,0 +1,152 @@
+<style>
+/* =============================================================
+   BASE STYLES - Reset, tipografia e elementos globais
+   ============================================================= */
+/* ===== RESET ===== */
+* {
+  box-sizing: border-box;
+}
+html, body {
+  overflow-x: hidden;
+  width: 100%;
+  min-height: 100%;
+  -webkit-text-size-adjust: 100%;
+  /* ✅ NOVO: Permitir pinch-to-zoom no mobile */
+  touch-action: manipulation;
+}
+body {
+  font-family: var(--font-family);
+  margin: 0;
+  padding: 0;
+  background: var(--color-bg-gradient);
+  min-height: 100vh;
+  color: var(--color-text);
+  line-height: 1.5;
+}
+img, video, iframe, canvas, svg {
+  max-width: 100%;
+  height: auto;
+}
+/* ===== CONTAINER ===== */
+.container {
+  max-width: var(--container-max-width);
+  width: 100%;
+  margin: 0 auto;
+  padding: var(--container-padding);
+  box-sizing: border-box;
+}
+/* ===== MAIN LAYOUT ===== */
+.main-layout {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  width: 100%;
+  margin-top: 10px;
+}
+@media (min-width: 1025px) {
+  .main-layout {
+    display: grid;
+    grid-template-columns: minmax(280px, 350px) 1fr;
+    gap: 30px;
+    align-items: start;
+  }
+}
+.left-column,
+.right-column {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-base);
+  width: 100%;
+  min-width: 0;
+}
+/* Wrapper: imagem + info lado a lado no mobile */
+.top-image-row {
+  display: flex;
+  flex-direction: row;
+  gap: var(--space-base);
+  align-items: stretch;
+  width: 100%;
+}
+.top-image-row > * {
+  flex: 1 1 50%;
+  min-width: 0;
+}
+@media (min-width: 1025px) {
+  .top-image-row {
+    flex-direction: column;
+  }
+  .top-image-row > * {
+    flex: none;
+    width: 100%;
+  }
+}
+@media (min-width: 900px) {
+  .left-column {
+    position: sticky;
+    top: 20px;
+  }
+}
+/* ===== TOTAL ===== */
+.total {
+  margin: 0 0 12px 0;
+  font-weight: 600;
+  color: var(--color-text);
+  padding: var(--space-base);
+  background: var(--color-card);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+  font-size: var(--fs-md);
+  -webkit-text-size-adjust: none;
+  text-size-adjust: none;
+}
+/* ===== MOBILE: Reordenar seções ===== */
+@media (max-width: 1024px) {
+  .right-column {
+    display: flex;
+    flex-direction: column;
+  }
+  /* Hero banner slim no topo */
+  .hero-banner-mobile {
+    order: 1;
+  }
+  .random-selection-container {
+    order: 2;
+  }
+  .mobile-instruction {
+    order: 3;
+  }
+  #containerNumeros {
+    order: 4;
+  }
+  .total {
+    order: 5;
+  }
+  /* Info de selecionados/comprados vai para baixo */
+  .left-column {
+    order: 10;
+  }
+}
+#erroNumeros {
+  color: var(--color-danger-medium);
+  font-size: var(--fs-xs);
+  display: none;
+}
+.action-buttons {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  width: 100%;
+}
+/* ===== PIX INFO ===== */
+.pix-info {
+  margin-top: 20px;
+  padding: 15px;
+  background: var(--color-card);
+  border-left: 5px solid var(--color-success);
+  border-radius: 5px;
+  box-shadow: var(--shadow-sm);
+}
+.pix-info strong {
+  color: var(--color-success);
+}
+</style>

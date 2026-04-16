@@ -1,0 +1,26 @@
+<div id="popupJaConfirmado" style="display:none;">
+  <div id="popupJaConfirmadoInner">
+    <div id="popupJaConfirmadoIcon">&#x2705;</div>
+    <h3 id="popupJaConfirmadoTitulo">Dados já confirmados!</h3>
+    <p id="popupJaConfirmadoFrase1">Seus dados já foram verificados com sucesso.</p>
+    <p id="popupJaConfirmadoFrase2">
+      Selecione os números desejados na grade e clique no botão
+      <strong>Comprar</strong> para concluir sua reserva.
+    </p>
+    <button id="popupJaConfirmadoBtn" onclick="fecharPopupJaConfirmado()">Entendido!</button>
+  </div>
+</div>
+
+<script>
+  function mostrarPopupJaConfirmado() {
+    document.getElementById('popupJaConfirmado').style.display = 'flex';
+  }
+  function fecharPopupJaConfirmado() {
+    document.getElementById('popupJaConfirmado').style.display = 'none';
+  }
+  document.addEventListener('DOMContentLoaded', function() {
+    document.getElementById('popupJaConfirmado').addEventListener('click', function(e) {
+      if (e.target === this) fecharPopupJaConfirmado();
+    });
+  });
+</script>

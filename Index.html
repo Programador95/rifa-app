@@ -1,0 +1,84 @@
+<!-- ===============================================================
+     10_Index.html - ATUALIZADO
+     
+     MUDANÇAS:
+     1. Incluir DesignTokens PRIMEIRO (antes de todos os CSS)
+     2. Remover: ResponsiveStyles.html e DesktopStyles.html (não existem mais)
+     3. Adicionar botão de Dark Mode no menu (dentro do Header)
+     =============================================================== -->
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <title>Rifa Online 🎟️</title>
+  <meta name="viewport"
+    content="width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=5.0, user-scalable=yes">
+  <!-- 1. DESIGN TOKENS - DEVE SER O PRIMEIRO CSS -->
+  <?!= include('DesignTokens') ?>
+  <!-- 2. CSS dos componentes (ordem não importa mais, pois usam variáveis) -->
+  <?!= include('BaseStyles') ?>
+  <?!= include('LayoutStyles') ?>
+  <?!= include('NumberGridStyles') ?>
+  <?!= include('ButtonStyles') ?>
+  <?!= include('FormStyles') ?>
+  <?!= include('PopupStyles') ?>
+  <?!= include('UtilityStyles') ?>
+  <!-- REMOVIDOS: DesktopStyles e ResponsiveStyles (absorvidos pelo DesignTokens) -->
+</head>
+<body>
+  <!-- ToastContainer -->
+  <?!= include('ToastContainer') ?>
+  <!-- Container principal -->
+  <div class="container">
+    <?!= include('Header') ?>
+    <!-- Layout Principal em Duas Colunas -->
+    <div class="main-layout">
+      <!-- Coluna Esquerda (desktop: sidebar sticky / mobile: abaixo da grade) -->
+      <div class="left-column">
+        <div class="top-image-row">
+          <?!= include('ProductImage') ?>
+          <?!= include('NumberInfo') ?>
+        </div>
+        <?!= include('ProgressBar') ?>
+        <?!= include('ProgressText') ?>
+      </div>
+      <!-- Coluna Direita (desktop: área principal / mobile: topo) -->
+      <div class="right-column">
+        <!-- Hero banner slim (mobile: imagem + progress compactos) -->
+        <div class="hero-banner-mobile">
+          <div class="hero-banner-inner">
+            <img id="heroPrizeImg" src="https://m.media-amazon.com/images/S/aplus-media-library-service-media/a1243fb1-4f1d-4a0e-a481-611ac36146fc.__CR0,0,650,350_PT0_SX650_V1___.jpg" alt="Prêmio" class="hero-prize-thumb" loading="lazy">
+            <div class="hero-prize-info">
+              <strong class="hero-prize-title">🏆 Concorra ao Prêmio!</strong>
+              <div class="hero-progress-inline">
+                <div class="progress-container hero-progress-bar">
+                  <div class="progress-bar" id="heroProgressBar"></div>
+                </div>
+                <span class="hero-progress-text" id="heroProgressText">0% reservados</span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <?!= include('RandomSelection') ?>
+        <?!= include('GridTitle') ?>
+        <?!= include('NumberGrid') ?>
+        <?!= include('TotalSection') ?>
+      </div>
+    </div>
+  </div>
+  <!-- Elementos fora do container -->
+  <?!= include('WhatsAppPopup') ?>
+  <?!= include('ScrollButtons') ?>
+  <?!= include('WhatsAppLink') ?>
+  <?!= include('Overlay') ?>
+  <?!= include('SuccessPopup') ?>
+  <?!= include('InfoPopups') ?>
+  <?!= include('RecoveryPopup') ?>
+  <?!= include('PaymentPopup') ?>
+  <?!= include('UserDataPopup') ?>
+  <?!= include('JaConfirmadoPopup') ?>
+  <?!= include('RecoveryScripts') ?>
+  <!-- JavaScript sempre por último -->
+  <?!= include('Scripts') ?>
+</body>
+</html>

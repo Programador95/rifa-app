@@ -1,0 +1,19 @@
+<div class="total" id="total">
+  Nenhum número selecionado.</div>
+<span id="erroNumeros"></span>
+
+<!-- Botões flutuantes que aparecem ao selecionar números -->
+<div id="floatingActions" class="floating-actions" style="display:none;">
+  <div class="floating-actions-inner">
+    <div class="floating-summary" id="floatingSummary"></div>
+    <div class="floating-buttons">
+      <button type="button" id="btnComprar" class="btn-floating btn-floating-comprar" onclick="abrirPopupDadosUsuario()">🛒 Comprar</button>
+      <!-- Botão Recuperar: visível apenas em modo recuperação -->
+      <button type="button" id="btnRecuperar" class="btn-floating btn-floating-comprar" style="display:none;" onclick="abrirRecoveryPaymentFromGrid()">🔄 Recuperar</button>
+      <button type="button" id="btnLimpar" onclick="limparSelecao()" class="btn-floating btn-floating-limpar">🗑️ Limpar</button>
+    </div>
+  </div>
+</div>
+
+</form>
+</div>

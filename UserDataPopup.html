@@ -1,0 +1,51 @@
+<!-- ===== POPUP DE DADOS DO USUÁRIO (Novo Fluxo) ===== -->
+<div id="popupDadosUsuario" class="popup-overlay" style="display:none;" onclick="fecharPopupDadosSeFora(event)">
+  <div class="popup-verificacao popup-dados-usuario">
+    <div class="popup-header">
+      <h2>📝 Seus Dados</h2>
+      <p>Preencha Nome e Telefone</p>
+    </div>
+
+    <div class="dados-form-container">
+      <div class="dados-form-group">
+        <label for="popupNome"><strong>👤 Nome:</strong></label>
+        <input type="text" id="popupNome" name="popupNome" required maxlength="30"
+          title="Apenas letras e espaços são permitidos (máximo 30 caracteres)"
+          onkeypress="return validarNome(event)"
+          oninput="validarNomeInput(event)"
+          onpaste="limparNomeColar(event)"
+          placeholder="Seu nome completo">
+      </div>
+
+      <div class="dados-form-group">
+        <label for="popupTelefone"><strong>📱 Telefone (WhatsApp):</strong></label>
+        <input type="tel" id="popupTelefone" name="popupTelefone" maxlength="15" required
+          placeholder="(00) 00000-0000">
+      </div>
+    </div>
+
+    <!-- Resumo dos números selecionados -->
+    <div class="dados-resumo">
+      <span id="popupResumoNumeros"></span>
+    </div>
+
+    <!-- Mensagem de erro -->
+    <div id="popupDadosErro" class="status-message status-error" style="display:none;"></div>
+
+    <div class="popup-buttons">
+      <button type="button"
+              id="btnConfirmarDadosPopup"
+              class="btn-popup btn-reenviar"
+              style="background: linear-gradient(135deg, #28a745, #20c997); color: white; border: none;"
+              onclick="confirmarDadosEComprar()">
+        ✅ Confirmar
+      </button>
+
+      <button type="button"
+              class="btn-popup btn-cancelar"
+              onclick="fecharPopupDadosUsuario()">
+        ✖️ Cancelar
+      </button>
+    </div>
+  </div>
+</div>

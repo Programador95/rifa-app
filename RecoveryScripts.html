@@ -1,0 +1,581 @@
+<script>
+// ===== RECOVERY SCRIPTS - Lógica completa de recuperação de reserva =====
+let recoveryMode = null;
+let timerRecoveryInterval = null;
+let verificacaoRecoveryInterval = null;
+let tentativasComprovanteRecovery = 0;
+let recoveryJaConcluido = false;
+const MAX_TENTATIVAS_COMPROVANTE_RECOVERY = 3;
+
+// ===== LIMPEZA CENTRALIZADA =====
+// Único ponto de limpeza do estado recovery — chamado por TODOS os caminhos de saída
+function _limparEstadoRecovery() {
+    recoveryJaConcluido = true;
+    limparTimerRecovery();
+    if (verificacaoRecoveryInterval) {
+        clearInterval(verificacaoRecoveryInterval);
+        verificacaoRecoveryInterval = null;
+    }
+    window.recoveryPaymentData = null;
+    window.recoveryDados = null;
+    recoveryMode = null;
+    tentativasComprovanteRecovery = 0;
+    selecoesUsuario = [];
+    // Remover banner
+    const banner = document.getElementById('recoveryBanner');
+    if (banner) banner.remove();
+    desativarBotaoRecuperar();
+    // No novo fluxo, não há overlay de bloqueio para restaurar
+    // Apenas garantir que os botões estão no estado correto
+    if (!dadosUsuario || !dadosUsuario.validado) {
+        desabilitarBotaoComprar();
+        desabilitarBotaoSelecionar();
+        // WhatsApp não confirmado → habilitar Confirmar Dados para nova validação
+        habilitarBotaoConfirmarDados();
+    }
+    // Se WhatsApp estava confirmado → Confirmar Dados permanece desabilitado (já validado)
+}
+
+// ===== FUNÇÕES DO POPUP DE RECOVERY (Etapa 1 e 2) =====
+function abrirRecoveryPopup() {
+    recoveryJaConcluido = false;
+    const popup = document.getElementById('recoveryPopup');
+    document.getElementById('recoveryStep1').style.display = 'block';
+    document.getElementById('recoveryStep2').style.display = 'none';
+    document.getElementById('recoveryStep3Payment').style.display = 'none';
+    document.getElementById('recoveryStepLoading').style.display = 'none';
+    document.getElementById('recoveryCodigo').value = '';
+    document.getElementById('recoveryErro').style.display = 'none';
+    const btnComp = document.getElementById('btnRecoveryComprovante');
+    if (btnComp) { btnComp.disabled = false; btnComp.textContent = 'Enviar Comprovante'; }
+    const comprovanteInput = document.getElementById('recoveryComprovanteInput');
+    if (comprovanteInput) comprovanteInput.value = '';
+    tentativasComprovanteRecovery = 0;
+    popup.style.display = 'block';
+    document.getElementById('overlay').style.display = 'block';
+    setTimeout(() => document.getElementById('recoveryCodigo').focus(), 300);
+}
+
+function fecharRecoveryPopup() {
+    document.getElementById('recoveryPopup').style.display = 'none';
+    document.getElementById('overlay').style.display = 'none';
+    limparTimerRecovery();
+    // Só atualizar grid se não estiver transitando para modo recovery no grid
+    if (!recoveryMode) {
+        forcarAtualizacaoNumeros();
+    }
+}
+
+function voltarStep1Recovery() {
+    document.getElementById('recoveryStep2').style.display = 'none';
+    document.getElementById('recoveryStep1').style.display = 'block';
+}
+
+function buscarReservaPendente() {
+    const codigo = document.getElementById('recoveryCodigo').value.trim();
+    if (codigo.length !== 6 || !/^\d{6}$/.test(codigo)) {
+        document.getElementById('recoveryErro').textContent = 'Digite um código válido de 6 dígitos.';
+        document.getElementById('recoveryErro').style.display = 'block';
+        return;
+    }
+    document.getElementById('recoveryErro').style.display = 'none';
+    document.getElementById('recoveryStep1').style.display = 'none';
+    document.getElementById('recoveryStepLoading').style.display = 'block';
+    document.getElementById('recoveryLoadingMsg').textContent = 'Buscando reserva...';
+    const telefone = dadosUsuario.telefone || '';
+    google.script.run
+        .withSuccessHandler(function(resultado) {
+            document.getElementById('recoveryStepLoading').style.display = 'none';
+            if (!resultado.encontrado) {
+                document.getElementById('recoveryStep1').style.display = 'block';
+                document.getElementById('recoveryErro').textContent = resultado.motivo || 'Reserva não encontrada.';
+                document.getElementById('recoveryErro').style.display = 'block';
+                return;
+            }
+            document.getElementById('recoveryNome').textContent = resultado.dados.nome;
+            document.getElementById('recoveryTelDisplay').textContent = resultado.dados.telefone;
+            document.getElementById('recoveryNumeros').textContent = resultado.dados.numeros.join(', ');
+            document.getElementById('recoveryValor').textContent = resultado.dados.valor.toFixed(2).replace('.', ',');
+            document.getElementById('recoveryMotivo').textContent = resultado.dados.motivo || 'Comprovante não enviado';
+            window.recoveryDados = resultado;
+            const dispDiv = document.getElementById('recoveryDisponibilidade');
+            const opcoesDiv = document.getElementById('recoveryOpcoes');
+            const novosObrigDiv = document.getElementById('recoveryNovosObrigatorio');
+            if (resultado.todosDisponiveis) {
+                dispDiv.style.background = '#d4edda';
+                dispDiv.style.color = '#155724';
+                dispDiv.innerHTML = '✅ Todos os seus números originais estão disponíveis!';
+                opcoesDiv.style.display = 'block';
+                novosObrigDiv.style.display = 'none';
+            } else if (resultado.numerosDisponiveis.length > 0) {
+                dispDiv.style.background = '#fff3cd';
+                dispDiv.style.color = '#856404';
+                dispDiv.innerHTML = `⚠️ Parcialmente disponíveis:<br>
+                    ✅ Disponíveis: ${resultado.numerosDisponiveis.join(', ')}<br>
+                    ❌ Ocupados: ${resultado.numerosOcupados.join(', ')}`;
+                opcoesDiv.style.display = 'none';
+                novosObrigDiv.style.display = 'block';
+            } else {
+                dispDiv.style.background = '#ffebee';
+                dispDiv.style.color = '#c62828';
+                dispDiv.innerHTML = '❌ Nenhum dos seus números originais está disponível.';
+                opcoesDiv.style.display = 'none';
+                novosObrigDiv.style.display = 'block';
+            }
+            document.getElementById('recoveryStep2').style.display = 'block';
+        })
+        .withFailureHandler(function(erro) {
+            document.getElementById('recoveryStepLoading').style.display = 'none';
+            document.getElementById('recoveryStep1').style.display = 'block';
+            document.getElementById('recoveryErro').textContent = 'Erro ao buscar: ' + (erro.message || erro);
+            document.getElementById('recoveryErro').style.display = 'block';
+        })
+        .buscarPendente({ telefone: telefone, codigo: codigo });
+}
+
+// ===== OPÇÃO 1: Manter mesmos números =====
+function confirmarRecuperacaoMesmosNumeros() {
+    const dados = window.recoveryDados;
+    if (!dados) return;
+    document.getElementById('recoveryStep2').style.display = 'none';
+    document.getElementById('recoveryStepLoading').style.display = 'block';
+    document.getElementById('recoveryLoadingMsg').textContent = 'Pré-reservando números...';
+    google.script.run
+        .withSuccessHandler(function(resultado) {
+            document.getElementById('recoveryStepLoading').style.display = 'none';
+            if (!resultado.success) {
+                mostrarErroPersonalizado('⚠️ ' + resultado.motivo + ' Escolha novos números.');
+                confirmarRecuperacaoNovosNumeros();
+                return;
+            }
+            desabilitarBotaoConfirmarDados(); // Desativar enquanto está no fluxo de recuperação
+            abrirRecoveryPaymentPopup(resultado, dados);
+        })
+        .withFailureHandler(function(erro) {
+            document.getElementById('recoveryStepLoading').style.display = 'none';
+            document.getElementById('recoveryStep2').style.display = 'block';
+            mostrarErroPersonalizado('Erro ao pré-reservar: ' + (erro.message || erro));
+        })
+        .processarRecuperacao({
+            codigo: dados.dados.codigo,
+            nome: dados.dados.nome,
+            telefone: dados.dados.telefone,
+            numeros: dados.dados.numeros,
+            userId: obterIdUsuario(),
+            linhaPendente: dados.dados.linhaPendente,
+            timestampReserva: dados.dados.timestampReserva
+        });
+}
+
+// ===== OPÇÃO 2: Escolher novos números (volta ao grid) =====
+function confirmarRecuperacaoNovosNumeros() {
+    const dados = window.recoveryDados;
+    if (!dados) return;
+    recoveryMode = {
+        codigo: dados.dados.codigo,
+        nome: dados.dados.nome,
+        telefone: dados.dados.telefone,
+        numerosOriginais: dados.dados.numeros,
+        valor: dados.dados.valor,
+        timestampReserva: dados.dados.timestampReserva,
+        linhaPendente: dados.dados.linhaPendente,
+        quantidadeOriginal: dados.dados.numeros.length
+    };
+    fecharRecoveryPopup(); // recoveryMode != null → não dispara forcarAtualizacaoNumeros
+    liberarNumeros();      // Desbloquear grade para seleção
+    mostrarBannerRecovery();
+    ativarBotaoRecuperar();
+    desabilitarBotaoConfirmarDados(); // Desativar enquanto está no modo recuperação
+    mostrarErro('Modo Recuperação ativado! Selecione ' + recoveryMode.quantidadeOriginal + ' número(s) e clique em "Recuperar".', 'success');
+}
+
+// ===== BANNER DE MODO RECUPERAÇÃO =====
+function mostrarBannerRecovery() {
+    const bannerExistente = document.getElementById('recoveryBanner');
+    if (bannerExistente) bannerExistente.remove();
+    const banner = document.createElement('div');
+    banner.id = 'recoveryBanner';
+    banner.style.cssText = `
+        background: linear-gradient(135deg, #ff9800, #f57c00);
+        color: white; padding: 12px 16px; border-radius: 8px;
+        margin-bottom: 12px; display: flex; justify-content: space-between;
+        align-items: center; box-shadow: 0 2px 8px rgba(255,152,0,0.3); font-size: 14px;
+    `;
+    banner.innerHTML = `
+        <div>
+            <strong>🔄 Modo Recuperação</strong><br>
+            <span style="font-size:12px;">Reserva #${recoveryMode.codigo} — Selecione ${recoveryMode.quantidadeOriginal} número(s)</span>
+        </div>
+        <button onclick="cancelarModoRecovery()" style="
+            background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.5);
+            color: white; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 12px;
+        ">✕ Cancelar</button>
+    `;
+    const gridTitle = document.querySelector('.right-column') || document.getElementById('numeros');
+    if (gridTitle) gridTitle.insertBefore(banner, gridTitle.firstChild);
+}
+
+function ativarBotaoRecuperar() {
+    const btnComprar = document.getElementById('btnComprar');
+    const btnRecuperar = document.getElementById('btnRecuperar');
+    if (btnComprar) btnComprar.style.display = 'none';
+    if (btnRecuperar) btnRecuperar.style.display = 'inline-flex';
+}
+
+function desativarBotaoRecuperar() {
+    const btnComprar = document.getElementById('btnComprar');
+    const btnRecuperar = document.getElementById('btnRecuperar');
+    if (btnComprar) btnComprar.style.display = 'inline-flex';
+    if (btnRecuperar) btnRecuperar.style.display = 'none';
+}
+
+// Cancelar modo recovery (pelo banner ✕ ou pelo botão Cancelar do popup nas etapas 1/2)
+function cancelarModoRecovery() {
+    renderNumerosComSelecoes(todosNumeros, todosIndisponiveis, []);
+    atualizarTotal();
+    _limparEstadoRecovery();
+    // Fechar popup antes de mostrar toast para overlay não bloquear
+    document.getElementById('recoveryPopup').style.display = 'none';
+    document.getElementById('overlay').style.display = 'none';
+    setTimeout(() => mostrarErro('⚠️ Modo recuperação cancelado.', 'warning'), 100);
+}
+
+// ===== BOTÃO "RECUPERAR" NO GRID (novos números) =====
+function abrirRecoveryPaymentFromGrid() {
+    if (!recoveryMode) {
+        mostrarErroPersonalizado('Erro: modo recuperação não está ativo.');
+        return;
+    }
+    let numerosSelecionados = Array.from(
+        document.querySelectorAll('input[name="numeros"]:checked')
+    ).map(cb => cb.value.padStart(3, '0'));
+    numerosSelecionados = numerosSelecionados.filter(num => !numerosCompradosUsuario.includes(num));
+    if (numerosSelecionados.length === 0) {
+        mostrarErroPersonalizado('Por favor, selecione pelo menos um número.');
+        return;
+    }
+    const conflitos = verificarConflitos(numerosSelecionados);
+    if (conflitos.length > 0) {
+        selecoesUsuario = selecoesUsuario.filter(num => !conflitos.includes(num));
+        renderNumerosComSelecoes(todosNumeros, todosIndisponiveis, selecoesUsuario);
+        mostrarErroPersonalizado('Números já reservados: ' + conflitos.join(', ') + '. Selecione outros.');
+        return;
+    }
+    const btnRecuperar = document.getElementById('btnRecuperar');
+    const textoOriginal = btnRecuperar.innerHTML;
+    btnRecuperar.innerHTML = '⏳ Pré-reservando...';
+    btnRecuperar.disabled = true;
+    google.script.run
+        .withSuccessHandler(function(resultado) {
+            btnRecuperar.innerHTML = textoOriginal;
+            btnRecuperar.disabled = false;
+            if (!resultado.success) {
+                mostrarErroPersonalizado('❌ ' + (resultado.motivo || 'Erro na pré-reserva'));
+                return;
+            }
+            bloquearNumeros(numerosSelecionados);
+            congelarNumerosParaPagamento(numerosSelecionados);
+            const dadosRecovery = {
+                dados: {
+                    codigo: recoveryMode.codigo,
+                    nome: recoveryMode.nome,
+                    telefone: recoveryMode.telefone,
+                    timestampReserva: recoveryMode.timestampReserva,
+                    linhaPendente: recoveryMode.linhaPendente
+                }
+            };
+            resultado.numerosReservados = resultado.numerosReservados || numerosSelecionados;
+            abrirRecoveryPaymentPopup(resultado, dadosRecovery);
+            const banner = document.getElementById('recoveryBanner');
+            if (banner) banner.remove();
+        })
+        .withFailureHandler(function(erro) {
+            btnRecuperar.innerHTML = textoOriginal;
+            btnRecuperar.disabled = false;
+            mostrarErroPersonalizado('Erro: ' + (erro.message || erro));
+        })
+        .processarRecuperacaoComCredito({
+            codigo: recoveryMode.codigo,
+            nome: recoveryMode.nome,
+            telefone: recoveryMode.telefone,
+            novosNumeros: numerosSelecionados,
+            userId: obterIdUsuario(),
+            linhaPendente: recoveryMode.linhaPendente,
+            credito: recoveryMode.valor,
+            timestampReserva: recoveryMode.timestampReserva
+        });
+}
+
+// ===== POPUP DE PAGAMENTO RECOVERY (Etapa 3) =====
+function abrirRecoveryPaymentPopup(resultado, dadosOriginal) {
+    const numeros = resultado.numerosReservados;
+    const valor = resultado.valorTotal || (numeros.length * PRECO);
+    const codigo = resultado.codigo || dadosOriginal.dados.codigo;
+    const numerosDiv = document.getElementById('recoveryNumerosConfirmados');
+    numerosDiv.innerHTML = '';
+    numeros.forEach(num => {
+        const span = document.createElement('span');
+        span.textContent = num.padStart(3, '0');
+        span.className = 'numero-comprado';
+        span.style.cssText = 'display:inline-block;padding:4px 8px;background:#28a745;color:white;border-radius:4px;font-weight:bold;font-size:14px;';
+        numerosDiv.appendChild(span);
+    });
+    document.getElementById('recoveryValorTotal').textContent = valor.toFixed(2).replace('.', ',');
+    document.getElementById('recoveryCodigoDisplay').textContent = codigo;
+    window.recoveryPaymentData = {
+        numeros: numeros,
+        nome: dadosOriginal.dados.nome,
+        telefone: dadosOriginal.dados.telefone,
+        codigo: codigo,
+        userId: obterIdUsuario(),
+        timestampReserva: dadosOriginal.dados.timestampReserva,
+        linhaPendente: dadosOriginal.dados.linhaPendente,
+        valorTotal: valor
+    };
+    // Sempre resetar botão e input ao entrar na etapa 3
+    const comprovanteInput = document.getElementById('recoveryComprovanteInput');
+    if (comprovanteInput) comprovanteInput.value = '';
+    const btnComp = document.getElementById('btnRecoveryComprovante');
+    if (btnComp) { btnComp.disabled = false; btnComp.textContent = 'Enviar Comprovante'; }
+    tentativasComprovanteRecovery = 0;
+    recoveryJaConcluido = false;
+    document.getElementById('recoveryStep1').style.display = 'none';
+    document.getElementById('recoveryStep2').style.display = 'none';
+    document.getElementById('recoveryStepLoading').style.display = 'none';
+    document.getElementById('recoveryStep3Payment').style.display = 'block';
+    document.getElementById('recoveryPopup').style.display = 'block';
+    document.getElementById('overlay').style.display = 'block';
+    iniciarTimerRecovery();
+    iniciarVerificacaoSegurancaRecovery(numeros);
+}
+
+// ===== TIMER DE 10 MINUTOS =====
+function iniciarTimerRecovery() {
+    limparTimerRecovery();
+    let tempoRestante = 10 * 60;
+    const timerEl = document.getElementById('timerRecovery');
+    function atualizarTimer() {
+        const minutos = Math.floor(tempoRestante / 60);
+        const segundos = tempoRestante % 60;
+        timerEl.textContent = `${String(minutos).padStart(2, '0')}:${String(segundos).padStart(2, '0')}`;
+        if (tempoRestante <= 60) timerEl.style.color = '#c62828';
+        if (tempoRestante <= 0) {
+            limparTimerRecovery();
+            timerEl.textContent = 'EXPIRADO!';
+            mostrarErroPersonalizado('⏰ Tempo de recuperação expirado. Os números foram liberados.');
+            cancelarRecoveryNoServidor();
+            setTimeout(() => {
+                _cancelarRecoveryComLimpeza();
+                forcarAtualizacaoNumeros();
+            }, 2000);
+            return;
+        }
+        tempoRestante--;
+    }
+    atualizarTimer();
+    timerRecoveryInterval = setInterval(atualizarTimer, 1000);
+}
+
+function limparTimerRecovery() {
+    if (timerRecoveryInterval) {
+        clearInterval(timerRecoveryInterval);
+        timerRecoveryInterval = null;
+    }
+}
+
+// ===== VERIFICAÇÃO DE SEGURANÇA (conflitos em paralelo) =====
+function iniciarVerificacaoSegurancaRecovery(numeros) {
+    if (verificacaoRecoveryInterval) clearInterval(verificacaoRecoveryInterval);
+    setTimeout(() => {
+        verificacaoRecoveryInterval = setInterval(() => {
+            if (recoveryJaConcluido || !window.recoveryPaymentData) {
+                clearInterval(verificacaoRecoveryInterval);
+                return;
+            }
+            google.script.run
+                .withSuccessHandler(resultado => {
+                    if (recoveryJaConcluido || !window.recoveryPaymentData) return;
+                    if (!resultado.sucesso) {
+                        console.log('❌ Conflito na recovery:', resultado.motivo);
+                        clearInterval(verificacaoRecoveryInterval);
+                        mostrarErroPersonalizado('⚠️ Conflito detectado: ' + resultado.motivo);
+                        setTimeout(() => {
+                            cancelarRecoveryNoServidor();
+                            _cancelarRecoveryComLimpeza();
+                            forcarAtualizacaoNumeros();
+                        }, 2000);
+                    }
+                })
+                .withFailureHandler(erro => console.error('Erro verificação recovery:', erro))
+                .verificarSegurancaReserva(numeros, obterIdUsuario());
+        }, 10000);
+    }, 15000);
+}
+
+// ===== ENVIAR COMPROVANTE RECOVERY =====
+function enviarComprovanteRecovery() {
+    const fileInput = document.getElementById('recoveryComprovanteInput');
+    const btn = document.getElementById('btnRecoveryComprovante');
+    if (!fileInput || !fileInput.files.length) {
+        mostrarErroPersonalizado('❌ Por favor, selecione um comprovante!');
+        return;
+    }
+    if (!window.recoveryPaymentData) {
+        mostrarErroPersonalizado('❌ Dados de recuperação não encontrados.');
+        return;
+    }
+    // ✅ Parar verificação de segurança IMEDIATAMENTE ao clicar enviar
+    // Evita que uma chamada em voo retorne após o servidor já ter marcado como Reservado
+    recoveryJaConcluido = true;
+    if (verificacaoRecoveryInterval) {
+        clearInterval(verificacaoRecoveryInterval);
+        verificacaoRecoveryInterval = null;
+    }
+    btn.disabled = true;
+    btn.textContent = '⏳ Validando comprovante...';
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        const fileData = e.target.result.split(',')[1];
+        const data = window.recoveryPaymentData;
+        const dadosComprovante = {
+            nome: data.nome,
+            telefone: data.telefone,
+            numeros: data.numeros,
+            userId: data.userId,
+            codigo: data.codigo,
+            fileName: fileInput.files[0].name,
+            mimeType: fileInput.files[0].type,
+            data: fileData,
+            recoveryTimestamp: data.timestampReserva,
+            linhaPendenteRecovery: data.linhaPendente
+        };
+        google.script.run
+            .withSuccessHandler(function() {
+                // Setar flag ANTES de qualquer outra coisa — para a verificação em voo
+                recoveryJaConcluido = true;
+                // Marcar pendente como recuperado no servidor
+                google.script.run
+                    .withSuccessHandler(() => console.log('✅ Pendente marcado como Recuperado'))
+                    .withFailureHandler(e => console.warn('⚠️ Erro ao marcar pendente:', e))
+                    .marcarPendenteComoRecuperado({ codigo: data.codigo, linhaPendente: data.linhaPendente });
+                // Atualizar lista local de números comprados
+                const novosNumeros = data.numeros.filter(num => !numerosCompradosUsuario.includes(num));
+                numerosCompradosUsuario = [...numerosCompradosUsuario, ...novosNumeros];
+                atualizarNumerosComprados(numerosCompradosUsuario);
+                // Garantir que os números recuperados também saiam de todosIndisponiveis
+                // e sejam tratados como compradosUsuario no próximo render
+                novosNumeros.forEach(num => {
+                    if (!todosIndisponiveis.includes(num)) todosIndisponiveis.push(num);
+                });
+                // Guardar mensagem de sucesso antes de limpar
+                const qtd = data.numeros.length;
+                const msgSucesso = qtd === 1
+                    ? '🎉 Número recuperado com sucesso!'
+                    : `🎉 ${qtd} números recuperados com sucesso!`;
+                // Limpeza completa via função centralizada
+                _limparEstadoRecovery();
+                // Recuperação concluída = equivale a uma compra → habilitar Confirmar Dados para próxima compra
+                habilitarBotaoConfirmarDados();
+                // Fechar popup de recovery
+                document.getElementById('recoveryPopup').style.display = 'none';
+                // Re-renderizar grid com numerosCompradosUsuario já atualizado
+                // (garante que o número recuperado apareça com cor correta sem esperar carregarDadosRifa)
+                renderNumerosComSelecoes(todosNumeros, todosIndisponiveis, []);
+                // Mostrar popup de sucesso
+                document.getElementById('successMessage').innerHTML = msgSucesso;
+                document.getElementById('successPopup').style.display = 'block';
+                document.getElementById('overlay').style.display = 'block';
+                // Recarregar dados
+                setTimeout(() => carregarDadosRifa(), 2000);
+            })
+            .withFailureHandler(function(erro) {
+                const mensagemErro = erro.message || erro.toString();
+                if (mensagemErro.includes('COMPROVANTE_INVALIDO') ||
+                    mensagemErro.includes('COMPROVANTE_FALSO') ||
+                    mensagemErro.includes('COMPROVANTE_ERRO')) {
+                    tentativasComprovanteRecovery++;
+                    if (tentativasComprovanteRecovery >= MAX_TENTATIVAS_COMPROVANTE_RECOVERY) {
+                        mostrarErroPersonalizado('❌ Comprovante inválido após 3 tentativas. Recuperação cancelada.');
+                        tentativasComprovanteRecovery = 0;
+                        setTimeout(() => {
+                            cancelarRecoveryNoServidor();
+                            _cancelarRecoveryComLimpeza();
+                            forcarAtualizacaoNumeros();
+                        }, 3000);
+                    } else {
+                        const restantes = MAX_TENTATIVAS_COMPROVANTE_RECOVERY - tentativasComprovanteRecovery;
+                        const motivo = mensagemErro.split(': ').slice(1).join(': ') || 'Comprovante não reconhecido';
+                        mostrarErroPersonalizado(
+                            `❌ ${motivo}\n\nEnvie outro comprovante. (${restantes} tentativa${restantes > 1 ? 's' : ''} restante${restantes > 1 ? 's' : ''})`
+                        );
+                        fileInput.value = '';
+                        btn.disabled = false;
+                        btn.textContent = 'Enviar Comprovante';
+                    }
+                } else {
+                    mostrarErroPersonalizado('Erro ao enviar: ' + mensagemErro);
+                    fileInput.value = '';
+                    btn.disabled = false;
+                    btn.textContent = 'Enviar Comprovante';
+                }
+            })
+            .salvarComprovante(dadosComprovante);
+    };
+    reader.readAsDataURL(fileInput.files[0]);
+}
+
+// ===== CANCELAR RECOVERY PAYMENT (botão Cancelar da etapa 3) =====
+function cancelarRecoveryPayment() {
+    cancelarRecoveryNoServidor();
+    if (window.recoveryPaymentData) {
+        liberarNumeros(window.recoveryPaymentData.numeros);
+        restaurarEstadoNormal();
+    }
+    _cancelarRecoveryComLimpeza();
+    forcarAtualizacaoNumeros();
+}
+
+// Cancela e fecha popup — sem toast (usado por timer, conflito e cancelarRecoveryPayment)
+function _cancelarRecoveryComLimpeza() {
+    _limparEstadoRecovery();
+    document.getElementById('recoveryPopup').style.display = 'none';
+    document.getElementById('overlay').style.display = 'none';
+}
+
+function cancelarRecoveryNoServidor() {
+    if (!window.recoveryPaymentData) return;
+    google.script.run
+        .withSuccessHandler(() => console.log('✅ Pré-reserva recovery cancelada no servidor'))
+        .withFailureHandler(e => console.warn('⚠️ Erro ao cancelar recovery:', e))
+        .cancelarReserva({
+            numeros: window.recoveryPaymentData.numeros,
+            nome: window.recoveryPaymentData.nome,
+            telefone: window.recoveryPaymentData.telefone,
+            userId: window.recoveryPaymentData.userId,
+            codigo: window.recoveryPaymentData.codigo
+        });
+    if (window.recoveryPaymentData.linhaPendente || window.recoveryPaymentData.codigo) {
+        google.script.run
+            .withSuccessHandler(() => console.log('✅ Pendente revertido para Pendente'))
+            .withFailureHandler(e => console.warn('⚠️ Erro ao reverter pendente:', e))
+            .reverterPreRecuperacaoParaPendente({
+                codigo: window.recoveryPaymentData.codigo,
+                linhaPendente: window.recoveryPaymentData.linhaPendente
+            });
+    }
+}
+
+function forcarAtualizacaoNumeros() {
+    setTimeout(() => carregarDadosRifa(), 500);
+    setTimeout(() => carregarDadosRifa(), 2000);
+}
+
+// Wrapper para fluxo normal de comprovante
+function confirmarPagamentoComVerificacao() {
+    if (window.recoveryPaymentData && document.getElementById('recoveryStep3Payment').style.display !== 'none') {
+        enviarComprovanteRecovery();
+        return;
+    }
+    confirmarPagamento();
+}
+</script>
